@@ -1,0 +1,661 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>A Dashboard I Guess?</title>
+    <meta charset="utf-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script type="module">
+  // 1. Core Firebase SDK Imports (Using only your 2 explicit URLs)
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-analytics.js";
+
+  // 2. Firebase App Credentials Configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyAqy6NWFJ1KD9Cfv_WyqbMJJWCqlC5P7Es",
+    authDomain: "://firebaseapp.com",
+    projectId: "app-iguess-39f2f",
+    storageBucket: "app-iguess-39f2f.firebasestorage.app",
+    messagingSenderId: "1056619953768",
+    appId: "1:1056619953768:web:6ac154660c07c48a5005dd",
+    measurementId: "G-J4736J0D8J"
+  };
+
+  // 3. Core Engine Initializations
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+
+  // --- Simplified HTTP REST Firestore Sync ---
+  async function saveToFirestoreREST(username, payload) {
+    const targetUrl = `https://googleapis.com{firebaseConfig.projectId}/databases/(default)/documents/users/${username}`;
+    
+    // Clean, direct payload fields with NO hash properties required
+    const firestoreDocument = {
+      fields: {
+        username: { stringValue: payload.username },
+        gmail: { stringValue: payload.gmail },
+        dob: { stringValue: payload.dob },
+        age: { stringValue: payload.age },
+        "AES-256 encrypted password": { stringValue: payload.password }
+      }
+    };
+
+    const response = await fetch(targetUrl, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(firestoreDocument)
+    });
+
+    if (!response.ok) throw new Error("Firestore write failed");
+  }
+
+  // --- 1-Minute Status Heartbeats ---
+  function startRESTHeartbeat(username) {
+    const targetUrl = `https://${firebaseConfig.projectId}://firebaseio.com{username}.json`;
+    
+    const sendPing = async () => {
+      const pingPayload = {
+        status: navigator.onLine ? "online" : "offline",
+        lastPing: Date.now()
+      };
+
+      try {
+        await fetch(targetUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pingPayload)
+        });
+      } catch (err) {
+        console.error("Presence update failed:", err);
+      }
+    };
+
+    sendPing();
+    setInterval(sendPing, 60000); // Sends state pulse every 1 minute
+  }
+
+  // --- Age Tier Calculator ---
+  function getAgeTier(dobString) {
+    const today = new Date();
+    const birthDate = new Date(dobString);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    
+    if (age < 13) return "1";
+    if (age >= 13 && age <= 17) return "2";
+    if (age >= 18 && age <= 20) return "3";
+    return "4";
+  }
+
+  // --- Form pipeline processing logic ---
+  async function handleSignUp(event) {
+    event.preventDefault();
+
+    const username = document.getElementById('username').value;
+    const gmail = document.getElementById('gmail').value;
+    const dob = document.getElementById('dob').value;
+    const rawPassword = document.getElementById('password').value;
+
+    const ageTier = getAgeTier(dob);
+    const encryptedPassword = CryptoJS.AES.encrypt(rawPassword, "YOUR_SECRET_KEY").toString();
+
+    try {
+      await saveToFirestoreREST(username, {
+        username: username,
+        gmail: gmail,
+        dob: dob,
+        age: ageTier,
+        password: encryptedPassword
+      });
+      
+      localStorage.setItem("rememberedUser", JSON.stringify({ username, gmail, dob }));
+      startRESTHeartbeat(username);
+    } catch (error) {
+      console.error(error);
+      
+    }
+  }
+
+  // --- Initialization Hook ---
+  window.addEventListener('DOMContentLoaded', () => {
+    const savedData = localStorage.getItem("rememberedUser");
+    if (savedData) {
+      const user = JSON.parse(savedData);
+      if(document.getElementById('username')) document.getElementById('username').value = user.username;
+      if(document.getElementById('gmail')) document.getElementById('gmail').value = user.gmail;
+      if(document.getElementById('dob')) document.getElementById('dob').value = user.dob;
+      
+      startRESTHeartbeat(user.username);
+    }
+
+    document.getElementById('signup-form').addEventListener('submit', handleSignUp);
+  });
+</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background-color: #F5F5F5;
+            display: flex;
+            margin: 0;
+            padding-top: 50px; /* Clearance for top bar */
+            padding-left: 180px; /* Clearance for sidebar */
+            font-family: sans-serif;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .btn {
+            height: 65px;
+            width: 115px;
+            border: #000000 solid 3px;
+            border-radius: 5%;
+            background-color: #00AAFF;
+        }
+        
+        /* Huge master wrapper dive set to fill remaining screen space precisely */
+        .page-view {
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            border-left: #000000 solid 3px; /* Keeps the border dividing it from the sidebar */
+            background-color: #FDFDFD;
+            padding: 20px;
+            box-sizing: border-box;
+            width: 100%; /* Spans remaining viewport width */
+            height: calc(100vh - 50px); /* Spans remaining viewport height exactly */
+            
+            /* FIXED: Completely removed top border and top gaps so it touches the header */
+            border-top: none;
+            border-right: none;
+            border-bottom: none;
+            margin-top: 0; 
+        }
+        
+        /* Utility class to show the active huge dive */
+        .page-view.active {
+            display: flex;
+        }
+
+        /* Combined structural styling rules for sidebar area alignment */
+        .sidebar {
+            top: 50px; /* Pushed down past the search bar */
+            left: 0px;
+            height: calc(100vh - 50px);
+            width: 180px;
+            border: #000000 solid 3px;
+            background-color: #0099EE;
+            position: fixed;
+            display: flex;
+            flex-direction: column;
+            border-top: none;
+            border-bottom: none;
+            border-left: none;
+            box-sizing: border-box; 
+        }
+        .srh {
+            position: fixed;
+            top: 0px;
+            left: 0px;
+            height: 50px; 
+            width: 180px;
+            background-color: #0099EE;
+            border: #000000 solid 3px;
+            border-bottom: none;
+            border-top: none;
+            border-left: none;
+            padding: 6px 4px; 
+            z-index: 10;
+            box-sizing: border-box; 
+        }
+        .side-item {
+            border-bottom: #333333 solid 3px;
+            height: 35px;
+            width: 100%; 
+            background-color: #0099EE;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+            cursor: pointer;
+            transition: box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
+        }
+        #signup-form {
+  background-color: #1d1d22;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 380px;
+  border: 1px solid #29292e;
+  margin: 20px auto; /* Centers the form box on your existing body background */
+}
+
+h2 {
+  margin-top: 0;
+  margin-bottom: 24px;
+  font-size: 24px;
+  text-align: center;
+  color: #ffffff;
+}
+
+#signup-form div {
+  margin-bottom: 18px;
+}
+
+#signup-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #a8a8b3;
+  font-weight: 500;
+}
+
+#signup-form input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 6px;
+  border: 2px solid #29292e;
+  background-color: #121214;
+  color: #ffffff;
+  font-size: 15px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#signup-form input:focus {
+  outline: none;
+  border-color: #00875f;
+  box-shadow: 0 0 0 3px rgba(0, 135, 95, 0.2);
+}
+
+#signup-form input::placeholder {
+  color: #505059;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+#signup-form button {
+  width: 100%;
+  padding: 14px;
+  background-color: #00875f;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-top: 10px;
+}
+
+#signup-form button:hover {
+  background-color: #00b37e;
+}
+        .side-item:hover {
+            border-color: #FFFF00;
+            background-color: #0088DD;
+        }
+        
+        /* GLOW EFFECT: Applies only to the active sidebar button */
+        .side-item.active {
+            border-bottom: #00FF66 solid 3px;
+            background-color: #00b359;
+            box-shadow: 0 0 12px rgba(0, 255, 102, 0.8), inset 0 0 8px rgba(0, 255, 102, 0.5);
+            color: #FFFFFF;
+        }
+        
+        .search {
+            background-color: #FFFFFF;
+            height: 24px; 
+            width: 102px;
+            border: #000000 solid 3px;
+            border-radius: 5%;
+        }
+        .search-btn {
+            width: 58px;
+            height: 30px; 
+            border: #000000 solid 3px;
+            border-radius: 10%;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .search-btn:hover {
+            outline: #FFFF00 solid 2px;
+        }
+        .search-btn:active {
+            transform: scale(0.94);
+        }
+        .shit {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            height: 100%;
+        }
+        #pixel-canvas {
+    display: grid;
+    /* TRACKS CHANGED: Now handles exactly 32 columns and rows */
+    grid-template-columns: repeat(32, 14px); 
+    grid-template-rows: repeat(32, 14px);
+    gap: 1px; 
+    margin-top: 20px;
+    background-color: #333333;
+    padding: 5px;
+    width: fit-content;
+    border: #000000 solid 3px;
+}
+
+.pixel {
+    width: 14px;
+    height: 14px;
+}
+/* Drops the entire container down right at the top center of the browser screen */
+/* Makes the container occupy the absolute full screen viewport layer */
+.form-container {
+  background-color: #1d1d22;
+  padding: 40px;
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  
+  /* Fixed positioning properties stretched to all four corners */
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 99999;
+
+  /* Flexbox positioning elements to center the active form content perfectly */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Constrains only the inner content forms so they don't look awkwardly stretched */
+.form-view {
+  display: none;
+  width: 100%;
+  max-width: 400px; /* Kept fields tightly organized at an easy-to-read width */
+}
+
+.form-view.active {
+  display: block;
+}
+
+/* Centers the navigation tabs wrapper right above the active centered form text */
+.form-tabs {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 30px;
+  border-bottom: 2px solid #29292e;
+}
+
+
+    </style>
+</head>
+<body>
+<div class="srh">
+    <div class="shit">
+        <input class="search" placeholder="search anything..." id="find" oninput="Search();">
+        <button class="search-btn" onclick="Search();">Search</button> 
+    </div>
+</div>
+    <div class="sidebar">
+    <button id="btn-dashboard" class="side-item active" onclick="SwitchTab('dashboard');">Dashboard</button>
+    <button id="btn-settings" class="side-item" onclick="SwitchTab('settings');">Settings</button>
+    <!-- Changed "btn-art" to "btn-qr" and SwitchTab tracking to 'qr' -->
+    <button id="btn-qr" class="side-item" onclick="SwitchTab('qr');">QR Code</button>
+</div>
+
+<!-- Huge Wrapper Dives completely flush with the top bar -->
+<div id="dashboard" class="page-view active">
+    <h1>DASHBOARD</h1>
+    <p>Welcome to your control panel area.</p>
+</div>
+
+<div id="settings" class="page-view">
+    <h1>SETTINGS</h1>
+    <p>Configure your dashboard values here.</p>
+</div>
+
+<!-- Changed ID from "art" to "qr" -->
+<div id="qr" class="page-view">
+    <h1>QR CODE</h1>
+    <div id="pixel-canvas"></div>
+</div>
+<!-- Full-Screen Container Layout -->
+<div class="form-container" style="background-color: #1d1d22; font-family: 'Segoe UI', system-ui, sans-serif; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; padding: 20px;">
+  
+  <!-- Centered Navigation Tabs Header Track -->
+  <div class="form-tabs" style="display: flex; justify-content: space-around; width: 100%; max-width: 400px; margin-bottom: 25px; border-bottom: 2px solid #29292e; box-sizing: border-box;">
+    <button type="button" class="tab-btn active" id="tab-login" style="background: none; border: none; color: #00875f; padding: 12px 24px; font-size: 16px; font-weight: 600; cursor: pointer; position: relative;">Login</button>
+    <button type="button" class="tab-btn" id="tab-signup" style="background: none; border: none; color: #a8a8b3; padding: 12px 24px; font-size: 16px; font-weight: 600; cursor: pointer; position: relative;">Sign Up</button>
+  </div>
+
+  <!-- 1. The Independent Login Interface View -->
+    <!-- 1. The Independent Login Interface View -->
+  <div id="login-view" class="form-view active" style="width: 100%; max-width: 400px; box-sizing: border-box; display: block;">
+    <form id="login-form" style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="login-username" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Username</label>
+        <input type="text" id="login-username" placeholder="Enter username" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="login-password" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
+      </div>
+
+      <button type="submit" style="width: 100%; padding: 14px; background-color: #00875f; color: #ffffff; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px;">Log In</button>
+      
+      <!-- Continue as Guest Action Trigger Link -->
+      <div style="text-align: center; margin-top: 8px;">
+        <a href="#" id="guest-login-btn" style="color: #a8a8b3; font-size: 14px; text-decoration: none; font-weight: 500; transition: color 0.2s ease;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#a8a8b3'">Continue as Guest</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 3. Dynamic Tab View Switching Handler Script -->
+<script>
+  const loginTab = document.getElementById('tab-login');
+  const signupTab = document.getElementById('tab-signup');
+  const loginView = document.getElementById('login-view');
+  const signupView = document.getElementById('signup-view');
+
+  loginTab.addEventListener('click', () => {
+    // Style toggle
+    loginTab.style.color = '#00875f';
+    signupTab.style.color = '#a8a8b3';
+    // View display toggle
+    loginView.style.display = 'block';
+    signupView.style.display = 'none';
+  });
+
+  signupTab.addEventListener('click', () => {
+    // Style toggle
+    signupTab.style.color = '#00875f';
+    loginTab.style.color = '#a8a8b3';
+    // View display toggle
+    signupView.style.display = 'block';
+    loginView.style.display = 'none';
+  });
+</script>
+
+
+    <script>
+          // Guest login navigation handler route
+  document.getElementById('guest-login-btn').addEventListener('click', (event) => {
+    event.preventDefault(); // Blocks the link from refreshing the screen
+    
+    // Generate a quick random ID so guest heartbeats don't overwrite each other
+    const guestId = 'guest_' + Math.floor(Math.random() * 100000);
+    
+    // Save to localStorage so your system remembers they are in a local session
+    localStorage.setItem("rememberedUser", JSON.stringify({ 
+      username: guestId, 
+      gmail: 'guest@app.local', 
+      dob: '2000-01-01' 
+    }));
+
+    
+    // Instantly hide the full-screen modal layer to show your underlying website application
+    document.querySelector('.form-container').style.display = 'none';
+    
+    // Safely fire your 1-minute tracking interval function on the guest profile node
+    if (typeof startRESTHeartbeat === "function") {
+      startRESTHeartbeat(guestId);
+    }
+  });
+
+        let found = null;
+let look = null;
+let currentTab = "dashboard";
+
+// Changed "art" to "qr" so routing, tabs, and search look for the new element IDs
+const menus = ["dashboard", "settings", "qr"];
+
+
+                                        const colors = { 
+    "4": "#111111",  // Black
+    "8": "#FFFFFF"   // White
+};
+
+// Fixed 32x32 Matrix: Restored original data with corrected QR finder patterns
+const smily_face_emoji = [
+    "4","4","4","4","4","4","4","8","4","8","4","4","8","8","4","8","4","8","8","4","4","8","8","4","8","4","4","4","4","4","4","4",
+    "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","4","8","4","8","8","8","8","8","4",
+    "4","8","4","4","4","8","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
+    "4","8","4","4","4","8","4","8","4","4","8","8","8","8","4","8","8","8","4","4","4","8","8","4","8","4","8","4","4","4","8","4",
+    "4","8","4","4","4","8","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
+    "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","4","8","4","8","8","8","8","8","4",
+    "4","4","4","4","4","4","4","8","4","8","4","8","4","8","4","8","4","8","4","8","4","8","4","8","4","4","4","4","4","4","4","4",
+    "8","8","8","8","8","8","8","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","8","8","8","8","8","8","8",
+    "8","4","8","4","4","8","4","4","8","8","4","4","8","4","8","4","4","4","4","8","4","4","4","8","4","4","4","8","8","4","4","8",
+    "4","4","4","8","8","4","8","4","4","8","4","8","4","8","4","8","4","4","8","8","4","4","8","4","8","8","8","4","4","8","4","8",
+    "4","8","8","4","8","4","4","8","8","4","8","4","8","4","4","4","8","4","4","4","8","4","8","8","4","4","4","8","4","8","4","4",
+    "4","8","4","4","4","4","8","8","4","4","8","8","8","8","8","8","4","4","8","4","4","8","4","4","8","4","8","4","8","8","4","8",
+    "4","8","4","4","4","8","4","8","4","8","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4",
+    "4","8","8","8","8","8","8","8","8","4","4","8","8","4","8","4","8","8","4","4","8","4","4","8","4","4","4","8","4","8","4","8",
+    "4","4","4","4","4","4","4","8","4","8","4","8","4","4","8","8","4","8","4","8","8","4","8","4","4","8","8","4","4","8","8","4",
+    "8","8","8","8","8","8","8","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","8","8","4","8",
+    "8","4","8","4","4","8","4","4","8","8","4","4","8","4","8","4","4","4","4","8","4","4","4","8","4","4","4","8","8","4","4","8",
+    "4","4","4","8","8","4","8","4","4","8","4","8","4","8","4","8","4","4","8","8","4","4","8","4","8","8","8","4","4","8","4","8",
+    "4","8","8","4","8","4","4","8","8","4","8","4","8","4","4","4","8","4","4","4","8","4","8","8","4","4","4","8","4","8","4","4",
+    "4","8","4","4","4","4","8","8","4","4","8","8","8","8","8","8","4","4","8","4","4","8","4","4","8","4","8","4","8","8","4","8",
+    "4","8","4","4","4","8","4","8","4","8","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4",
+    "4","4","4","4","4","4","8","8","4","8","4","8","4","4","8","8","4","8","4","8","8","4","8","4","4","4","4","4","4","4","4","4",
+    "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","8","4","8","8","8","8","8","8","4",
+    "4","8","4","4","4","8","8","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
+    "8","8","8","8","8","8","4","8","4","4","8","8","8","8","4","8","8","8","4","4","4","8","8","4","8","4","8","4","4","4","8","4",
+    "4","4","4","4","4","4","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
+    "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","8","4","8","8","8","8","8","8","4",
+    "4","8","4","4","4","8","4","8","4","8","4","8","4","4","8","8","4","8","4","8","8","4","8","4","4","4","4","4","4","4","4","4",
+    "4","8","4","4","4","8","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","8","8","4","8",
+    "4","8","4","4","4","8","4","8","8","4","4","8","4","4","4","4","8","4","4","4","8","4","4","4","8","8","4","4","8","4","4","8",
+    "4","8","8","8","8","8","4","8","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4",
+    "4","4","4","4","4","4","4","8","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4"
+];
+
+
+
+
+        function SwitchTab(newtab) { 
+            menus.forEach(m => {
+                const element = document.getElementById(m);
+                if (element) {
+                    element.classList.remove('active');
+                }
+                const btn = document.getElementById('btn-' + m);
+                if (btn) {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            const targetElement = document.getElementById(newtab);
+            const targetBtn = document.getElementById('btn-' + newtab);
+            
+            if (targetElement) {
+                targetElement.classList.add('active');
+                currentTab = newtab;
+            }
+            if (targetBtn) {
+                targetBtn.classList.add('active');
+            }
+        }
+
+        function Search() {
+            let searchVal = document.getElementById('find').value.toLowerCase().trim();
+            if (searchVal === "") return;
+
+            let matchedTab = menus.find(menu => {
+                let menuIdx = 0;
+                for (let char of searchVal) {
+                    menuIdx = menu.indexOf(char, menuIdx);
+                    if (menuIdx === -1) return false;
+                    menuIdx++;
+                }
+                return true;
+            });
+
+            if (matchedTab) {
+                SwitchTab(matchedTab);
+            }
+        }
+        // 1. Update the menus array at the top so SwitchTab() and Search() know it exists
+
+// 2. Add this generator function to the very bottom of your script
+function drawPixelArt() {
+    const canvas = document.getElementById('pixel-canvas');
+    if (!canvas) return;
+    
+    // Clear out existing content first just in case
+    canvas.innerHTML = ''; 
+    
+    smily_face_emoji.forEach(colorIndex => {
+        const pixel = document.createElement('div');
+        pixel.classList.add('pixel');
+        pixel.style.backgroundColor = colors[colorIndex];
+        canvas.appendChild(pixel);
+    });
+}
+
+window.addEventListener('DOMContentLoaded', drawPixelArt);
+    </script>
+    <script>
+  // Interface Visual Control
+  document.getElementById('signup-form').addEventListener('submit', () => {
+    const ssnField = document.getElementById('ssn');
+    if (ssnField && ssnField.value) {
+      // Instantly wipes the joke input value from the UI layout after submission
+      setTimeout(() => { ssnField.value = ''; }, 1000);
+    }
+  });
+</script>
+    <script>
+  // Simple view switcher logic toggling visibility layout attributes
+  const loginTab = document.getElementById('tab-login');
+  const signupTab = document.getElementById('tab-signup');
+  const loginView = document.getElementById('login-view');
+  const signupView = document.getElementById('signup-view');
+
+  loginTab.addEventListener('click', () => {
+    loginTab.classList.add('active');
+    signupTab.classList.remove('active');
+    loginView.classList.add('active');
+    signupView.classList.remove('active');
+  });
+
+  signupTab.addEventListener('click', () => {
+    signupTab.classList.add('active');
+    loginTab.classList.remove('active');
+    signupView.classList.add('active');
+    loginView.classList.remove('active');
+  });
+</script>
+
+</body>
+</html>
