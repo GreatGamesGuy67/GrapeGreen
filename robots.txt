@@ -10,3 +10,4 @@ Disallow: /stored_ssns/ # (Psych, we don't even store them lol)
 
 # If you can read this, you passed the vibe check.
 Allow: /
+# ohio
