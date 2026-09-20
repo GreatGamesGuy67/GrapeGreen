@@ -3,6 +3,9 @@
 <head>
     <title>A Dashboard I Guess?</title>
     <meta charset="utf-8">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script type="module">
   // 1. Core Firebase SDK Imports (Using only your 2 explicit URLs)
@@ -445,13 +448,47 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <button id="btn-settings" class="side-item" onclick="SwitchTab('settings');">Settings</button>
     <!-- Changed "btn-art" to "btn-qr" and SwitchTab tracking to 'qr' -->
     <button id="btn-qr" class="side-item" onclick="SwitchTab('qr');">QR Code</button>
+        <!--<button id="btn-map" class="side-item" onclick="SwitchTab('map');">Map</button>-->
 </div>
-
 <!-- Huge Wrapper Dives completely flush with the top bar -->
 <div id="dashboard" class="page-view active">
     <h1>DASHBOARD</h1>
     <p>Welcome to your control panel area.</p>
 </div>
+<!-- Independent Location Tracker Page View -->
+<!-- Independent Real Location Tracker Page View -->
+<div id="map" class="page-view" style="padding: 30px; background-color: #1d1d22; border-radius: 12px; max-width: 500px; margin: 20px auto; border: 1px solid #29292e; font-family: 'Segoe UI', system-ui, sans-serif; box-sizing: border-box; color: #ffffff; text-align: center;">
+    <h1 style="margin-top: 0; font-size: 24px; border-bottom: 2px solid #29292e; padding-bottom: 10px; color: #ffffff; text-transform: uppercase;">System Location Sync</h1>
+    <p style="color: #a8a8b3; font-size: 14px; margin-bottom: 25px;">Verifying terminal access network nodes...</p>
+
+    <!-- The Live Embedded Map Canvas Element -->
+    <div id="live-map-canvas" style="width: 100%; height: 260px; background: #121214; margin: 0 auto 25px; border-radius: 8px; border: 2px solid #00875f; box-shadow: 0 0 20px rgba(0, 135, 95, 0.15); z-index: 1;"></div>
+
+    <!-- Live Telemetry Data Readings Feedback Box -->
+    <div style="background: #121214; padding: 15px; border-radius: 8px; border: 1px solid #29292e; text-align: left; font-family: monospace; font-size: 12px; color: #00b37e; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box;">
+        <div>[NODE_01]: Client IP: <span id="radar-ip" style="color: #ffffff;">Detecting...</span></div>
+        <div>[NODE_02]: Target Area: <span id="radar-location" style="color: #ffffff;">Locating...</span></div>
+        <div style="border-top: 1px solid #29292e; padding-top: 8px; margin-top: 4px; color: #ff3333; font-weight: bold; text-align: center; animation: text-pulse 2s infinite;">
+            ⚠️ WARNING: Unknown terminal proxy detected 8.2km away.
+        </div>
+        <div style="color: #ff3333; font-weight: bold; text-align: center; font-size: 13px; letter-spacing: 0.5px;">
+            "I am here... and I'm watching."
+        </div>
+    </div>
+</div>
+
+<style>
+  @keyframes text-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  /* Forces the open-source map theme to fit a stylized dark mode look */
+  .leaflet-layer, .leaflet-control-zoom {
+    filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+  }
+  .leaflet-attribution-flag { display: none !important; }
+</style>
+
 
 <div id="settings" class="page-view" style="padding: 30px; background-color: #1d1d22; border-radius: 12px; max-width: 500px; margin: 20px auto; border: 1px solid #29292e; font-family: 'Segoe UI', system-ui, sans-serif; box-sizing: border-box; color: #ffffff;">
     <h1 style="margin-top: 0; font-size: 24px; border-bottom: 2px solid #29292e; padding-bottom: 10px; color: #ffffff;">SETTINGS</h1>
