@@ -168,6 +168,43 @@
             border-bottom: none;
             margin-top: 0; 
         }
+        /* Make the helper icon turn bright white when hovered */
+.joke-tooltip:hover {
+    opacity: 1 !important;
+}
+
+/* Base tooltip overlay pseudo-element structure */
+.joke-tooltip::after {
+    content: attr(data-tip); /* Dynamically renders whatever text you put inside data-tip="" */
+    position: absolute;
+    bottom: 130%; /* Suspends the bubble directly above the label line */
+    left: 50%;
+    transform: translateX(-50%);
+    
+    /* Dark theme bubble aesthetics to match your UI cards */
+    background-color: #1f1f23;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 400;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #29292e;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    
+    /* Behavior mechanics: invisible by default until focus actions */
+    width: 200px;
+    white-space: normal;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+}
+
+/* Tells the browser to smoothly fade-in the text bubble upon hover states */
+.joke-tooltip:hover::after {
+    opacity: 1;
+}
         
         /* Utility class to show the active huge dive */
         .page-view.active {
@@ -416,10 +453,56 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <p>Welcome to your control panel area.</p>
 </div>
 
-<div id="settings" class="page-view">
-    <h1>SETTINGS</h1>
-    <p>Configure your dashboard values here.</p>
+<div id="settings" class="page-view" style="padding: 30px; background-color: #1d1d22; border-radius: 12px; max-width: 500px; margin: 20px auto; border: 1px solid #29292e; font-family: 'Segoe UI', system-ui, sans-serif; box-sizing: border-box; color: #ffffff;">
+    <h1 style="margin-top: 0; font-size: 24px; border-bottom: 2px solid #29292e; padding-bottom: 10px; color: #ffffff;">SETTINGS</h1>
+    <p style="color: #a8a8b3; font-size: 14px; margin-bottom: 25px;">settings</p>
+
+    <!-- Profile Section -->
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px; background: #121214; padding: 15px; border-radius: 8px; border: 1px solid #29292e;">
+        <!-- Circular SVG Profile Icon -->
+        <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#00875f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="background: #1d1d22; padding: 5px; border-radius: 50%;">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        <div>
+            <div style="font-size: 12px; color: #a8a8b3; text-transform: uppercase; font-weight: bold;">Logged In As</div>
+            <div id="settings-username" style="font-size: 18px; font-weight: 600; color: #ffffff;">Guest</div>
+        </div>
+    </div>
+
+    <!-- Sliders Form Layout Block -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Brightness Slider Control -->
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-size: 14px; color: #a8a8b3; font-weight: 500; display: flex; justify-content: space-between;">
+                <span>Brightness</span>
+                <span id="brightness-val" style="color: #00875f;">100%</span>
+            </label>
+            <input type="range" id="setting-brightness" min="10" max="100" value="100" style="width: 100%; accent-color: #00875f; cursor: pointer;">
+        </div>
+
+        <!-- Sound Slider Control -->
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-size: 14px; color: #a8a8b3; font-weight: 500; display: flex; justify-content: space-between;">
+                <span>Sound Volume</span>
+                <span id="sound-val" style="color: #00875f;">80%</span>
+            </label>
+            <input type="range" id="setting-sound" min="0" max="100" value="80" style="width: 100%; accent-color: #00875f; cursor: pointer;">
+        </div>
+
+        <!-- Interactive Hidden Password Input Container -->
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px;">
+            <label for="settings-password" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Saved Application Password</label>
+            <div style="position: relative; width: 100%;">
+                <input type="password" id="settings-password" value="placeholder_password" readonly style="width: 100%; padding: 12px; padding-right: 45px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
+                
+                <!-- Eye Action Toggle Button -->
+                <button type="button" id="toggle-settings-password" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #a8a8b3; cursor: pointer; font-size: 14px; padding: 0; font-weight: bold; outline: none;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#a8a8b3'">SHOW</button>
+            </div>
+        </div>
+    </div>
 </div>
+
 
 <!-- Changed ID from "art" to "qr" -->
 <div id="qr" class="page-view">
@@ -436,7 +519,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 
   <!-- 1. The Independent Login Interface View -->
-    <!-- 1. The Independent Login Interface View -->
   <div id="login-view" class="form-view active" style="width: 100%; max-width: 400px; box-sizing: border-box; display: block;">
     <form id="login-form" style="display: flex; flex-direction: column; gap: 16px;">
       <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -457,9 +539,48 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       </div>
     </form>
   </div>
+
+  <!-- 2. The Restored Sign Up Interface View (PUT BACK IN) -->
+  <div id="signup-view" class="form-view" style="width: 100%; max-width: 400px; box-sizing: border-box; display: none;">
+    <form id="signup-form" style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="username" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Username</label>
+        <input type="text" id="username" placeholder="Choose a username" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="gmail" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Gmail</label>
+        <input type="email" id="gmail" placeholder="example@gmail.com" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="dob" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Date of Birth</label>
+        <input type="date" id="dob" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="password" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Password</label>
+        <input type="password" id="password" placeholder="••••••••" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+  <!-- New row wrapper that aligns the label and the tooltip icon horizontally -->
+  <div style="display: flex; align-items: center; gap: 6px; position: relative;">
+    <label for="ssn" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Social Security Number (Optional)</label>
+    
+    <!-- The Tooltip Icon Trigger Component -->
+    <span class="joke-tooltip" data-tip="We need this to ensure you aren't an advanced AI agent trying to steal our data." style="cursor: pointer; font-size: 14px; opacity: 0.6; transition: opacity 0.2s;">❓</span>
+  </div>
+  
+  <input type="text" id="ssn" placeholder="000-00-0000" style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
 </div>
 
-<!-- 3. Dynamic Tab View Switching Handler Script -->
+      <button type="submit" style="width: 100%; padding: 14px; background-color: #00875f; color: #ffffff; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px;">Register Account</button>
+    </form>
+  </div>
+
+</div>
+
 <script>
   const loginTab = document.getElementById('tab-login');
   const signupTab = document.getElementById('tab-signup');
@@ -467,19 +588,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   const signupView = document.getElementById('signup-view');
 
   loginTab.addEventListener('click', () => {
-    // Style toggle
     loginTab.style.color = '#00875f';
     signupTab.style.color = '#a8a8b3';
-    // View display toggle
+    loginView.style.color = '#ffffff';
     loginView.style.display = 'block';
     signupView.style.display = 'none';
   });
 
   signupTab.addEventListener('click', () => {
-    // Style toggle
     signupTab.style.color = '#00875f';
     loginTab.style.color = '#a8a8b3';
-    // View display toggle
     signupView.style.display = 'block';
     loginView.style.display = 'none';
   });
@@ -487,6 +605,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 
     <script>
+        
           // Guest login navigation handler route
   document.getElementById('guest-login-btn').addEventListener('click', (event) => {
     event.preventDefault(); // Blocks the link from refreshing the screen
@@ -510,6 +629,62 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       startRESTHeartbeat(guestId);
     }
   });
+// --- Settings View Controller Module ---
+window.addEventListener('DOMContentLoaded', () => {
+  // 1. Local Profile Detection Engine
+  const savedData = localStorage.getItem("rememberedUser");
+  if (savedData) {
+    const user = JSON.parse(savedData);
+    const nameDisplay = document.getElementById('settings-username');
+    if (nameDisplay) {
+      nameDisplay.textContent = user.username;
+    }
+  }
+
+  // 2. Password Visibility Handler Routine
+  const passwordInput = document.getElementById('settings-password');
+  const toggleBtn = document.getElementById('toggle-settings-password');
+
+  if (toggleBtn && passwordInput) {
+    toggleBtn.addEventListener('click', () => {
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleBtn.textContent = 'HIDE';
+        toggleBtn.style.color = '#00875f';
+      } else {
+        passwordInput.type = 'password';
+        toggleBtn.textContent = 'SHOW';
+        toggleBtn.style.color = '#a8a8b3';
+      }
+    });
+  }
+
+    // 3. UI Slider Control Sync Hooks (Fixed Brightness Inversion)
+  const brightInput = document.getElementById('setting-brightness');
+  const brightVal = document.getElementById('brightness-val');
+  if (brightInput && brightVal) {
+    brightInput.addEventListener('input', (e) => {
+      const sliderValue = parseInt(e.target.value);
+      
+      // Reverses the logic: 110 - sliderValue maps high values to high opacity
+      const invertedOpacity = (110 - sliderValue) / 100;
+      
+      brightVal.textContent = sliderValue + '%';
+      
+      // Applies the corrected reversed brightness layer cleanly
+      document.body.style.opacity = invertedOpacity;
+    });
+  }
+
+
+  const soundInput = document.getElementById('setting-sound');
+  const soundVal = document.getElementById('sound-val');
+  if (soundInput && soundVal) {
+    soundInput.addEventListener('input', (e) => {
+      soundVal.textContent = e.target.value + '%';
+    });
+  }
+});
 
         let found = null;
 let look = null;
