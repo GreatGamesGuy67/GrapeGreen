@@ -1,1034 +1,389 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>GrapeGreen Dashboard</title>
-    <meta charset="utf-8">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GrapeGreen Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<style>
+:root{--grape:#3b1a63;--grape2:#7a4bb8;--leaf:#a3d95c;--paper:#f6f2fb;--ink:#1b1030;--mute:#6b5f85;--line:#ddd3ee}
+*{box-sizing:border-box}
+body{margin:0;font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif;background:var(--paper);color:var(--ink)}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--leaf);outline-offset:2px}
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script type="module">
-  // 1. Core Firebase SDK Imports (Using only your 2 explicit URLs)
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-analytics.js";
+/* app shell */
+.top{position:fixed;top:0;left:0;right:0;height:50px;background:var(--grape);display:flex;align-items:center;gap:8px;padding:0 10px;z-index:10}
+.top b{color:var(--leaf);width:160px;font-size:18px}
+.top input{height:30px;width:min(240px,45vw);border:0;border-radius:8px;padding:0 10px}
+.top button{height:30px;border:0;border-radius:8px;background:var(--leaf);font-weight:700;padding:0 12px}
+.side{position:fixed;top:50px;left:0;bottom:0;width:180px;background:var(--grape2);display:flex;flex-direction:column}
+.side-item{height:44px;border:0;border-bottom:1px solid #ffffff33;background:none;color:#fff;text-align:left;padding:0 16px}
+.side-item:hover{background:#ffffff1f}
+.side-item.active{background:var(--leaf);color:var(--ink);font-weight:700}
+main{margin:50px 0 0 180px;padding:24px}
+.view{display:none}.view.active{display:block}
+.mute{color:var(--mute);font-size:13px}
+.pane{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;max-width:520px}
+.row{display:flex;flex-direction:column;gap:6px;margin:16px 0}
+.row label{display:flex;justify-content:space-between;font-size:14px;color:var(--mute)}
+.row input[type=range]{accent-color:var(--grape2)}
+.btn{background:var(--grape);color:#fff;border:0;border-radius:10px;padding:10px 16px;font-weight:700}
+.btn.red{background:#d63b3b}
+.doc{position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;max-width:520px}
+.doc pre{margin:0;overflow:auto;font-size:13px}
+.doc .btn{position:absolute;top:8px;right:8px;padding:4px 10px}
+#pixels{display:grid;grid-template-columns:repeat(32,12px);grid-auto-rows:12px;gap:1px;background:#333;padding:4px;width:fit-content;border:3px solid #000;margin-top:16px}
+.memes{display:flex;flex-wrap:wrap;gap:16px}
+.memes img{width:340px;max-width:100%;border:3px solid #000;border-radius:10px}
+#dim{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:9998}
 
-  // 2. Firebase App Credentials Configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyAqy6NWFJ1KD9Cfv_WyqbMJJWCqlC5P7Es",
-    authDomain: "://firebaseapp.com",
-    projectId: "app-iguess-39f2f",
-    storageBucket: "app-iguess-39f2f.firebasestorage.app",
-    messagingSenderId: "1056619953768",
-    appId: "1:1056619953768:web:6ac154660c07c48a5005dd",
-    measurementId: "G-J4736J0D8J"
-  };
-
-  // 3. Core Engine Initializations
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-
-  // --- Simplified HTTP REST Firestore Sync ---
-  async function saveToFirestoreREST(username, payload) {
-    const targetUrl = `https://googleapis.com{firebaseConfig.projectId}/databases/(default)/documents/users/${username}`;
-    
-    // Clean, direct payload fields with NO hash properties required
-    const firestoreDocument = {
-      fields: {
-        username: { stringValue: payload.username },
-        gmail: { stringValue: payload.gmail },
-        dob: { stringValue: payload.dob },
-        age: { stringValue: payload.age },
-        "AES-256 encrypted password": { stringValue: payload.password }
-      }
-    };
-
-    const response = await fetch(targetUrl, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(firestoreDocument)
-    });
-
-    if (!response.ok) throw new Error("Firestore write failed");
-  }
-
-  // --- 1-Minute Status Heartbeats ---
-  function startRESTHeartbeat(username) {
-    const targetUrl = `https://${firebaseConfig.projectId}://firebaseio.com{GreatGamesGuy67}.json`;
-    
-    const sendPing = async () => {
-      const pingPayload = {
-        status: navigator.onLine ? "online" : "offline",
-        lastPing: Date.now()
-      };
-
-      try {
-        await fetch(targetUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(pingPayload)
-        });
-      } catch (err) {
-        console.error("Presence update failed:", err);
-      }
-    };
-
-    sendPing();
-    setInterval(sendPing, 60000); // Sends state pulse every 1 minute
-  }
-
-  // --- Age Tier Calculator ---
-  function getAgeTier(dobString) {
-    const today = new Date();
-    const birthDate = new Date(dobString);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    
-    if (age < 13) return "1";
-    if (age >= 13 && age <= 17) return "2";
-    if (age >= 18 && age <= 20) return "3";
-    return "4";
-  }
-
-  // --- Form pipeline processing logic ---
-  async function handleSignUp(event) {
-    event.preventDefault();
-
-    const username = document.getElementById('username').value;
-    const gmail = document.getElementById('gmail').value;
-    const dob = document.getElementById('dob').value;
-    const rawPassword = document.getElementById('password').value;
-
-    const ageTier = getAgeTier(dob);
-    const encryptedPassword = CryptoJS.AES.encrypt(rawPassword, "AESFS_O1B8A9X83MBLP21DOG78PDHYI3").toString();
-
-    try {
-      await saveToFirestoreREST(username, {
-        username: username,
-        gmail: gmail,
-        dob: dob,
-        age: ageTier,
-        password: encryptedPassword
-      });
-      
-      localStorage.setItem("rememberedUser", JSON.stringify({ username, gmail, dob }));
-      startRESTHeartbeat(username);
-    } catch (error) {
-      console.error(error);
-      
-    }
-  }
-
-  // --- Initialization Hook ---
-  window.addEventListener('DOMContentLoaded', () => {
-    const savedData = localStorage.getItem("rememberedUser");
-    if (savedData) {
-      const user = JSON.parse(savedData);
-      if(document.getElementById('username')) document.getElementById('username').value = user.username;
-      if(document.getElementById('gmail')) document.getElementById('gmail').value = user.gmail;
-      if(document.getElementById('dob')) document.getElementById('dob').value = user.dob;
-      
-      startRESTHeartbeat(user.username);
-    }
-
-    document.getElementById('signup-form').addEventListener('submit', handleSignUp);
-  });
-</script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body {
-            background-color: #F5F5F5;
-            display: flex;
-            margin: 0;
-            padding-top: 50px; /* Clearance for top bar */
-            padding-left: 180px; /* Clearance for sidebar */
-            font-family: sans-serif;
-            height: 100vh;
-            box-sizing: border-box;
-        }
-        .btn {
-            height: 65px;
-            width: 115px;
-            border: #000000 solid 3px;
-            border-radius: 5%;
-            background-color: #00AAFF;
-        }
-        
-        /* Huge master wrapper dive set to fill remaining screen space precisely */
-        .page-view {
-            display: none; /* Hidden by default */
-            flex-direction: column;
-            border-left: #000000 solid 3px; /* Keeps the border dividing it from the sidebar */
-            background-color: #FDFDFD;
-            padding: 20px;
-            box-sizing: border-box;
-            width: 100%; /* Spans remaining viewport width */
-            height: calc(100vh - 50px); /* Spans remaining viewport height exactly */
-            
-            /* FIXED: Completely removed top border and top gaps so it touches the header */
-            border-top: none;
-            border-right: none;
-            border-bottom: none;
-            margin-top: 0; 
-        }
-        /* Make the helper icon turn bright white when hovered */
-.joke-tooltip:hover {
-    opacity: 1 !important;
-}
-
-/* Base tooltip overlay pseudo-element structure */
-.joke-tooltip::after {
-    content: attr(data-tip); /* Dynamically renders whatever text you put inside data-tip="" */
-    position: absolute;
-    bottom: 130%; /* Suspends the bubble directly above the label line */
-    left: 50%;
-    transform: translateX(-50%);
-    
-    /* Dark theme bubble aesthetics to match your UI cards */
-    background-color: #1f1f23;
-    color: #ffffff;
-    font-size: 12px;
-    font-weight: 400;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid #29292e;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    
-    /* Behavior mechanics: invisible by default until focus actions */
-    width: 200px;
-    white-space: normal;
-    text-align: center;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 10;
-}
-
-/* Tells the browser to smoothly fade-in the text bubble upon hover states */
-.joke-tooltip:hover::after {
-    opacity: 1;
-}
-        
-        /* Utility class to show the active huge dive */
-        .page-view.active {
-            display: flex;
-        }
-
-        /* Combined structural styling rules for sidebar area alignment */
-        .sidebar {
-            top: 50px; /* Pushed down past the search bar */
-            left: 0px;
-            height: calc(100vh - 50px);
-            width: 180px;
-            border: #000000 solid 3px;
-            background-color: #0099EE;
-            position: fixed;
-            display: flex;
-            flex-direction: column;
-            border-top: none;
-            border-bottom: none;
-            border-left: none;
-            box-sizing: border-box; 
-        }
-        .srh {
-            position: fixed;
-            top: 0px;
-            left: 0px;
-            height: 50px; 
-            width: 180px;
-            background-color: #0099EE;
-            border: #000000 solid 3px;
-            border-bottom: none;
-            border-top: none;
-            border-left: none;
-            padding: 6px 4px; 
-            z-index: 10;
-            box-sizing: border-box; 
-        }
-        .side-item {
-            border-bottom: #333333 solid 3px;
-            height: 35px;
-            width: 100%; 
-            background-color: #0099EE;
-            border-top: none;
-            border-left: none;
-            border-right: none;
-            cursor: pointer;
-            transition: box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
-        }
-        #signup-form {
-  background-color: #1d1d22;
-  padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  width: 100%;
-  max-width: 380px;
-  border: 1px solid #29292e;
-  margin: 20px auto; /* Centers the form box on your existing body background */
-}
-
-h2 {
-  margin-top: 0;
-  margin-bottom: 24px;
-  font-size: 24px;
-  text-align: center;
-  color: #ffffff;
-}
-
-#signup-form div {
-  margin-bottom: 18px;
-}
-
-#signup-form label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: #a8a8b3;
-  font-weight: 500;
-}
-
-#signup-form input {
-  width: 100%;
-  padding: 12px;
-  border-radius: 6px;
-  border: 2px solid #29292e;
-  background-color: #121214;
-  color: #ffffff;
-  font-size: 15px;
-  box-sizing: border-box;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-#signup-form input:focus {
-  outline: none;
-  border-color: #00875f;
-  box-shadow: 0 0 0 3px rgba(0, 135, 95, 0.2);
-}
-
-#signup-form input::placeholder {
-  color: #505059;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  cursor: pointer;
-}
-
-#signup-form button {
-  width: 100%;
-  padding: 14px;
-  background-color: #00875f;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  margin-top: 10px;
-}
-
-#signup-form button:hover {
-  background-color: #00b37e;
-}
-        .side-item:hover {
-            border-color: #FFFF00;
-            background-color: #0088DD;
-        }
-        
-        /* GLOW EFFECT: Applies only to the active sidebar button */
-        .side-item.active {
-            border-bottom: #00FF66 solid 3px;
-            background-color: #00b359;
-            box-shadow: 0 0 12px rgba(0, 255, 102, 0.8), inset 0 0 8px rgba(0, 255, 102, 0.5);
-            color: #FFFFFF;
-        }
-        
-        .search {
-            background-color: #FFFFFF;
-            height: 24px; 
-            width: 102px;
-            border: #000000 solid 3px;
-            border-radius: 5%;
-        }
-        .search-btn {
-            width: 58px;
-            height: 30px; 
-            border: #000000 solid 3px;
-            border-radius: 10%;
-            cursor: pointer;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        .search-btn:hover {
-            outline: #FFFF00 solid 2px;
-        }
-        .search-btn:active {
-            transform: scale(0.94);
-        }
-        .shit {
-            display: flex;
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-            height: 100%;
-        }
-        #pixel-canvas {
-    display: grid;
-    /* TRACKS CHANGED: Now handles exactly 32 columns and rows */
-    grid-template-columns: repeat(32, 14px); 
-    grid-template-rows: repeat(32, 14px);
-    gap: 1px; 
-    margin-top: 20px;
-    background-color: #333333;
-    padding: 5px;
-    width: fit-content;
-    border: #000000 solid 3px;
-}
-
-.pixel {
-    width: 14px;
-    height: 14px;
-}
-        .image {
-            height: 480px;
-            width: 340px;
-            border: #000000 solid 3px;
-            border-radius: 5%;
-                }
-/* Drops the entire container down right at the top center of the browser screen */
-/* Makes the container occupy the absolute full screen viewport layer */
-.form-container {
-  background-color: #1d1d22;
-  padding: 40px;
-  width: 100vw;
-  height: 100vh;
-  box-sizing: border-box;
-  
-  /* Fixed positioning properties stretched to all four corners */
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 99999;
-
-  /* Flexbox positioning elements to center the active form content perfectly */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-/* Constrains only the inner content forms so they don't look awkwardly stretched */
-.form-view {
-  display: none;
-  width: 100%;
-  max-width: 400px; /* Kept fields tightly organized at an easy-to-read width */
-}
-
-.form-view.active {
-  display: block;
-}
-
-/* Centers the navigation tabs wrapper right above the active centered form text */
-.form-tabs {
-  display: flex;
-  justify-content: space-around;
-  width: 100%;
-  max-width: 400px;
-  margin-bottom: 30px;
-  border-bottom: 2px solid #29292e;
-}
-.doc {
-    display: flex;
-    flex-direction: columm;
-    background-color: #BDBDBD;
-    min-height: 80px;
-    width: 230px;
-    border: #000000 solid 4px;
-    border-radius: 3%;
-    }
-.copy {
-    height: 25px;
-    width: 25px;
-    border: #000000 solid 2px;
-    border-radius: 8%;
-    background-color: #888888;
-    }
-        .copy:hover {
-            outline: #FFFF00 solid 1px;
-            }
-        .copy:active {
-            transform: scale(0.92);
-            }
-        .sus {
-        background-color: #FF0000;
-        height: 45px;
-        width: 85px;
-        border: #000000 solid 3px;
-        border-radius: 5%;
-        }
-    .sus:hover {
-        outline: #FFFF00 solid 2px;
-        }
-    .sus:active {
-        transform: scale(0.92);
-        }
-    .HidFromView {
-        display: hidden;
-        height: 1px;
-        width: 1px;
-        border: #00000000 solid 1px;
-        }
-        .lr {
-        min-height: 30px;
-        min-width: 300px;
-        display: flex;
-        flex-direction: row;
-        padding: 15px;
-        }
-        .td {
-        min-height: 50px;
-        min-width: 50px;
-        display: flex;
-        flex-direction: columm;
-            }
-        .pad {
-        padding: 3px;
-        width: 5px;
-        height: 5px;
-        display: hidden
-            }
-    </style>
+/* login screen */
+#gate{position:fixed;inset:0;z-index:9999;display:grid;grid-template-columns:1.1fr 1fr;background:var(--paper)}
+.brand{background:var(--grape);color:#fff;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:48px}
+.brand h1{font-size:clamp(40px,6vw,76px);line-height:.95;margin:0 0 12px;letter-spacing:-2px}
+.brand h1 span{color:var(--leaf)}
+.brand p{margin:0;max-width:30ch;color:#d9c9f2}
+.bunch{position:absolute;top:8%;left:50%;width:0;height:0}
+.bunch i{position:absolute;width:56px;height:56px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#b58cf0,var(--grape2) 55%,#4a2680);box-shadow:inset -4px -6px 10px #2a114a80}
+.bunch em{position:absolute;left:-6px;top:-58px;width:34px;height:70px;background:var(--leaf);border-radius:0 100% 0 100%;transform:rotate(-20deg)}
+.form-side{display:grid;place-items:center;padding:24px}
+.box{width:100%;max-width:360px}
+.seg{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid var(--line);margin-bottom:22px}
+.seg button{background:none;border:0;padding:10px;font-weight:700;color:var(--mute);border-bottom:3px solid transparent;margin-bottom:-2px}
+.seg .on{color:var(--grape);border-color:var(--grape2)}
+.box h2{margin:0 0 4px;font-size:26px}
+.box .f{margin:14px 0 0}
+.box label{display:block;font-size:13px;font-weight:700;margin-bottom:5px}
+.box input{width:100%;padding:12px;border:2px solid var(--line);border-radius:10px;font-size:15px;background:#fff}
+.box input:focus{border-color:var(--grape2);outline:0}
+.pw{position:relative}
+.pw button{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--grape2);font-weight:700;font-size:13px}
+.go{width:100%;margin-top:20px;padding:13px;border:0;border-radius:10px;background:var(--grape);color:#fff;font-weight:700;font-size:16px}
+.go:hover{background:var(--grape2)}
+.go:disabled{opacity:.6}
+.guest{display:block;text-align:center;margin-top:16px;color:var(--mute);font-size:14px}
+#err{min-height:20px;margin-top:12px;color:#c62828;font-size:14px}
+.hide{display:none!important}
+@media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}}
+</style>
 </head>
 <body>
-<div class="srh">
-    <div class="shit">
-        <input class="search" placeholder="search anything..." id="find" oninput="Search();">
-        <button class="search-btn" onclick="Search();">Search</button> 
-    </div>
-</div>
-    <div class="sidebar">
-    <button id="btn-dashboard" class="side-item active" onclick="SwitchTab('dashboard');">Dashboard</button>
-    <button id="btn-settings" class="side-item" onclick="SwitchTab('settings');">Settings</button>
-    <!-- Changed "btn-art" to "btn-qr" and SwitchTab tracking to 'qr' -->
-    <button id="btn-qr" class="side-item" onclick="SwitchTab('qr');">QR Code</button>
-        <button id="btn-molcular-science" class="side-item" onclick="SwitchTab('molcular-science');">atomic science</button>
-        <button id="btn-code-advice" class="side-item" onclick="SwitchTab('code-advice')">Coding Advice</button>
-        <button id="btn-memes" class="side-item" onclick="SwitchTab('memes')">Wall Of Memes</button>
-        <!--<button id="btn-map" class="side-item" onclick="SwitchTab('map');">Map</button>-->
-</div>
-    <div id="memes" class="page-view">
-<h1><strong>😂WALL OF MEMES🤣</strong></h1>
-        <small>take nothing personal</small>
-        <div class="td">
-        <div class="lr">
-        <img src="assets/images/scp173_meme.png" class="image">
-            <div class="pad"></div>
-            <img src="assets/images/scp096_meme.png" class="image">
-            </div>
-            <div class="lr"></div>
-            </div>
-        </div>
-<!-- Huge Wrapper Dives completely flush with the top bar -->
-<div id="dashboard" class="page-view active">
-    <h1>DASHBOARD</h1>
-    <h6>copyrighted by no one execpt owner©</h6>
-</div>
-    <div id="code-advice" class="page-view">
-        <h3>HTML skeleton</h3>
-    <div class="doc">
-        <button class="copy" onclick="copy(skeleton);">📋</button>
-        <code id="skeleton">
-        &lt!DOCTYPE HTML&gt
-        <br>
-        &ltmeta charset="UTF-8"&gt
-        <br>
-        &lthead&gt
-        <br>
-        &ltstyle&gt
-        <br>
-        head {
-        <br>
-        background-color: #f5f5f5;
-        <br>
-        }
-        <br>
-        .btn {
-        <br>
-        background-color: #00FF00;
-        <br>
-        height: 50px;
-        <br>
-        width: 80px;
-        <br>
-        }
-        <br>
-        &lt/style&gt
-        <br>
-        &lt/head&gt
-        <br>
-        &ltbody&gt
-        <br>
-        &ltbutton class="btn" onclick="poop();"&gtpoopysa buttcheek&lt/button&gt
-        <br>
-        &ltscript&gt
-        <br>
-        let poop = 0;
-        <br>
-        function poop(); {
-        <br>
-        let poop = poop + 7
-        <br>
-        }
-        <br>
-        &lt/script&gt
-        <br>
-        &lt/body&gt
-        <br>
-        &lt/html&gt
-    </code></div>
-    </div>
-    <div id="molcular-science" class="page-view">
-        <!--//here 67-->
-        <h1>Molcular Science</h1>
-        <h6>copyrighted by no one execpt owner©</h6>
-        <p>
-<strong>Hydrogen tank</strong> + <strong>oxygen tank</strong> =
-<br>
-<strong>(desired result)</strong> H2O. <small>water</small>
-<br>
-<strong>(byproducts)</strong> OH. <small>hydrogen ion or smth like that</small>
-<br>
-<strong>(byproducts)</strong> H2O2. <small>hydrogen peroxide</small>
-<br>
-<strong>(byproduct)</strong> heat/enegery. <small>you need enegery that is movement of atoms to bond</small>
-<br>
-<br>
-<strong>mix wrong:</strong>
-<br>
-<strong>(H2O2)</strong> <small>hydrogen peroxide</small>
-<br>
-<strong>(COOH)</strong> <small>amino acid from carbon in atmosphere</small>
-<br>
-<strong>(HOOH2H2O3O3h3o4h8o2o2h3O12H14)</strong> <small>your atomic reader shows what looks like monkey typing</small>
-            </p>
-    </div>
-<!-- Independent Location Tracker Page View -->
-<!-- Independent Real Location Tracker Page View -->
 
+<div id="dim"></div>
 
-<div id="settings" class="page-view" style="padding: 30px; background-color: #1d1d22; border-radius: 12px; max-width: 500px; margin: 20px auto; border: 1px solid #29292e; font-family: 'Segoe UI', system-ui, sans-serif; box-sizing: border-box; color: #ffffff;">
-    <h1 style="margin-top: 0; font-size: 24px; border-bottom: 2px solid #29292e; padding-bottom: 10px; color: #ffffff;">SETTINGS</h1>
-    <p style="color: #a8a8b3; font-size: 14px; margin-bottom: 25px;">settings</p>
-
-    <!-- Profile Section -->
-    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px; background: #121214; padding: 15px; border-radius: 8px; border: 1px solid #29292e;">
-        <!-- Circular SVG Profile Icon -->
-        <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#00875f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="background: #1d1d22; padding: 5px; border-radius: 50%;">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-            <circle cx="12" cy="7" r="4"></circle>
-        </svg>
-        <div>
-            <div style="font-size: 12px; color: #a8a8b3; text-transform: uppercase; font-weight: bold;">Logged In As</div>
-            <div id="settings-username" style="font-size: 18px; font-weight: 600; color: #ffffff;">Guest</div>
-        </div>
-    </div>
-
-    <!-- Sliders Form Layout Block -->
-    <div style="display: flex; flex-direction: column; gap: 20px;">
-        <!-- Brightness Slider Control -->
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-            <label style="font-size: 14px; color: #a8a8b3; font-weight: 500; display: flex; justify-content: space-between;">
-                <span>Brightness</span>
-                <span id="brightness-val" style="color: #00875f;">100%</span>
-            </label>
-            <input type="range" id="setting-brightness" min="10" max="100" value="100" style="width: 100%; accent-color: #00875f; cursor: pointer;">
-        </div>
-
-        <!-- Sound Slider Control -->
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-            <label style="font-size: 14px; color: #a8a8b3; font-weight: 500; display: flex; justify-content: space-between;">
-                <span>Sound Volume</span>
-                <span id="sound-val" style="color: #00875f;">80%</span>
-            </label>
-            <input type="range" id="setting-sound" min="0" max="100" value="80" style="width: 100%; accent-color: #00875f; cursor: pointer;">
-        </div>
-
-        <!-- Interactive Hidden Password Input Container -->
-        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px;">
-            <label for="settings-password" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Saved Application Password</label>
-            <div style="position: relative; width: 100%;">
-                <input type="password" id="settings-password" value="1234567890qwertyuiopasdfghjklzxcvbnm" readonly style="width: 100%; padding: 12px; padding-right: 45px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
-                
-                <!-- Eye Action Toggle Button -->
-                <button type="button" id="toggle-settings-password" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #a8a8b3; cursor: pointer; font-size: 14px; padding: 0; font-weight: bold; outline: none;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#a8a8b3'">SHOW</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-
-<!-- Changed ID from "art" to "qr" -->
-<div id="qr" class="page-view">
-    <h1>QR CODE</h1>
-    <div>
-    <h6>copyrighted by no one execpt owner©</h6>
-        <h3>totaly not sus download</h3>
-        <h5>(trust me bro)</h5>
-        <button class="sus" onclick="download(ThisIsNotVirus.exe.txt, 01010101-11001001-00110011);">Download File📥</button>
-        </div>
-    <div id="pixel-canvas"></div>
-</div>
-<!-- Full-Screen Container Layout -->
-<div class="form-container" style="background-color: #1d1d22; font-family: 'Segoe UI', system-ui, sans-serif; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; padding: 20px;">
-  
-  <!-- Centered Navigation Tabs Header Track -->
-  <div class="form-tabs" style="display: flex; justify-content: space-around; width: 100%; max-width: 400px; margin-bottom: 25px; border-bottom: 2px solid #29292e; box-sizing: border-box;">
-    <button type="button" class="tab-btn active" id="tab-login" style="background: none; border: none; color: #00875f; padding: 12px 24px; font-size: 16px; font-weight: 600; cursor: pointer; position: relative;">Login</button>
-    <button type="button" class="tab-btn" id="tab-signup" style="background: none; border: none; color: #a8a8b3; padding: 12px 24px; font-size: 16px; font-weight: 600; cursor: pointer; position: relative;">Sign Up</button>
+<div id="gate">
+  <div class="brand">
+    <div class="bunch" id="bunch"><em></em></div>
+    <h1>Grape<span>Green</span></h1>
+    <p>Your dashboard, your tabs, your memes.</p>
   </div>
+  <div class="form-side"><div class="box">
+    <div class="seg">
+      <button type="button" id="t-login" class="on">Log in</button>
+      <button type="button" id="t-signup">Sign up</button>
+    </div>
 
-  <!-- 1. The Independent Login Interface View -->
-  <div id="login-view" class="form-view active" style="width: 100%; max-width: 400px; box-sizing: border-box; display: block;">
-      <h1 style="color: #00FFAA;">GrapeGreen</h1>
-    <form id="login-form" style="display: flex; flex-direction: column; gap: 16px;">
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <label for="login-username" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Username</label>
-        <input type="text" id="login-username" placeholder="Enter username" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <label for="login-password" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Password</label>
-        <input type="password" id="login-password" placeholder="••••••••" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
-      </div>
-
-      <button type="submit" style="width: 100%; padding: 14px; background-color: #00875f; color: #ffffff; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px;">Log In</button>
-      
-      <!-- Continue as Guest Action Trigger Link -->
-      <div style="text-align: center; margin-top: 8px;">
-        <a href="#" id="guest-login-btn" style="color: #a8a8b3; font-size: 14px; text-decoration: none; font-weight: 500; transition: color 0.2s ease;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#a8a8b3'">Continue as Guest</a>
-      </div>
+    <form id="login-form">
+      <h2>Welcome back</h2>
+      <div class="f"><label for="li-user">Username</label><input id="li-user" autocomplete="username" required></div>
+      <div class="f"><label for="li-pass">Password</label>
+        <div class="pw"><input id="li-pass" type="password" autocomplete="current-password" required><button type="button" data-show="li-pass">Show</button></div></div>
+      <button class="go" type="submit">Log in</button>
+      <a href="#" class="guest" id="guest">Continue as guest</a>
     </form>
-  </div>
 
-  <!-- 2. The Restored Sign Up Interface View (PUT BACK IN) -->
-  <div id="signup-view" class="form-view" style="width: 100%; max-width: 400px; box-sizing: border-box; display: none;">
-    <form id="signup-form" style="display: flex; flex-direction: column; gap: 16px;">
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <label for="username" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Username</label>
-        <input type="text" id="username" placeholder="Choose a username" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <label for="gmail" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Gmail</label>
-        <input type="email" id="gmail" placeholder="example@gmail.com" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <label for="dob" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Date of Birth</label>
-        <input type="date" id="dob" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <label for="password" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Password</label>
-        <input type="password" id="password" placeholder="••••••••" required style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-  <!-- New row wrapper that aligns the label and the tooltip icon horizontally -->
-  <div style="display: flex; align-items: center; gap: 6px; position: relative;">
-    <label for="ssn" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Social Security Number (Optional)</label>
-    
-    <!-- The Tooltip Icon Trigger Component -->
-    <span class="joke-tooltip" data-tip="We need this to ensure you aren't an advanced AI agent trying to steal our data.(Totally safe trust me bro.)" style="cursor: pointer; font-size: 14px; opacity: 0.6; transition: opacity 0.2s;">❓</span>
-  </div>
-  
-  <input type="text" id="ssn" placeholder="000-00-0000" style="width: 100%; padding: 12px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
-</div>
-
-      <button type="submit" style="width: 100%; padding: 14px; background-color: #00875f; color: #ffffff; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px;">Register Account</button>
+    <form id="signup-form" class="hide">
+      <h2>Make an account</h2>
+      <div class="f"><label for="su-user">Username</label><input id="su-user" autocomplete="username" required></div>
+      <div class="f"><label for="su-dob">Date of birth</label><input id="su-dob" type="date" required></div>
+      <div class="f" id="mailrow"><label for="su-mail">Email</label><input id="su-mail" type="email" placeholder="you@gmail.com"></div>
+      <div class="f mute hide" id="kidnote">You're under 13, so we won't ask for or keep your email or birthday. You'll log in with your username and password.</div>
+      <div class="f"><label for="su-pass">Password (6+ characters)</label>
+        <div class="pw"><input id="su-pass" type="password" autocomplete="new-password" required minlength="6"><button type="button" data-show="su-pass">Show</button></div></div>
+      <button class="go" type="submit">Create account</button>
     </form>
-  </div>
-
+    <div id="err" role="alert"></div>
+  </div></div>
 </div>
+
+<div class="top">
+  <b>GrapeGreen</b>
+  <input id="find" placeholder="Search tabs..." aria-label="Search tabs">
+  <button id="find-btn">Search</button>
+</div>
+<nav class="side">
+  <button class="side-item active" data-tab="dashboard">Dashboard</button>
+  <button class="side-item" data-tab="settings">Settings</button>
+  <button class="side-item" data-tab="qr">QR Code</button>
+  <button class="side-item" data-tab="science">Atomic science</button>
+  <button class="side-item" data-tab="code">Coding advice</button>
+  <button class="side-item" data-tab="memes">Wall of memes</button>
+</nav>
+
+<main>
+  <section id="dashboard" class="view active">
+    <h1>Dashboard</h1>
+    <p class="mute">Copyrighted by no one except owner ©</p>
+  </section>
+
+  <section id="settings" class="view">
+    <h1>Settings</h1>
+    <div class="pane">
+      <div class="mute">Logged in as</div>
+      <div id="who" style="font-size:20px;font-weight:700">Guest</div>
+      <div class="row"><label for="bright"><span>Brightness</span><span id="bright-v">100%</span></label>
+        <input id="bright" type="range" min="10" max="100" value="100"></div>
+      <div class="row"><label for="sound"><span>Sound volume</span><span id="sound-v">80%</span></label>
+        <input id="sound" type="range" min="0" max="100" value="80"></div>
+      <button class="btn red" id="logout">Log out</button>
+    </div>
+  </section>
+
+  <section id="qr" class="view">
+    <h1>QR Code</h1>
+    <p class="mute">Copyrighted by no one except owner ©</p>
+    <h3>Totally not sus download</h3>
+    <button class="btn red" id="dl">Download file</button>
+    <div id="pixels"></div>
+  </section>
+
+  <section id="science" class="view">
+    <h1>Molecular Science</h1>
+    <p class="mute">Copyrighted by no one except owner ©</p>
+    <p><b>Hydrogen tank</b> + <b>oxygen tank</b> =<br>
+    <b>(desired result)</b> H2O <small>water</small><br>
+    <b>(byproduct)</b> OH <small>hydroxyl, a very reactive fragment</small><br>
+    <b>(byproduct)</b> H2O2 <small>hydrogen peroxide</small><br>
+    <b>(byproduct)</b> heat/energy <small>bonds forming release energy</small></p>
+    <p><b>Mix wrong:</b><br>
+    <b>(H2O2)</b> <small>hydrogen peroxide</small><br>
+    <b>(COOH)</b> <small>the carboxyl group found in amino acids</small><br>
+    <b>(HOOH2H2O3O3h3o4h8o2o2h3O12H14)</b> <small>your atomic reader shows what looks like monkey typing</small></p>
+  </section>
+
+  <section id="code" class="view">
+    <h1>Coding advice</h1>
+    <h3>HTML skeleton</h3>
+    <div class="doc"><button class="btn" id="copy">Copy</button><pre id="skeleton"></pre></div>
+  </section>
+
+  <section id="memes" class="view">
+    <h1>Wall of memes</h1>
+    <p class="mute">Take nothing personal</p>
+    <div class="memes">
+      <img src="assets/images/scp173_meme.png" alt="SCP-173 meme">
+      <img src="assets/images/scp096_meme.png" alt="SCP-096 meme">
+    </div>
+  </section>
+</main>
 
 <script>
-  const loginTab = document.getElementById('tab-login');
-  const signupTab = document.getElementById('tab-signup');
-  const loginView = document.getElementById('login-view');
-  const signupView = document.getElementById('signup-view');
+const $ = id => document.getElementById(id);
+const CFG = { projectId: "app-iguess-39f2f", apiKey: "AIzaSyAqy6NWFJ1KD9Cfv_WyqbMJJWCqlC5P7Es" };
+const DB = `https://firestore.googleapis.com/v1/projects/${CFG.projectId}/databases/(default)/documents/users`;
+const KEY = `?key=${CFG.apiKey}`;
 
-  loginTab.addEventListener('click', () => {
-    loginTab.style.color = '#00875f';
-    signupTab.style.color = '#a8a8b3';
-    loginView.style.color = '#ffffff';
-    loginView.style.display = 'block';
-    signupView.style.display = 'none';
-  });
+/* ---------- data layer ---------- */
+const hash = (pw, salt) => CryptoJS.PBKDF2(pw, salt, { keySize: 8, iterations: 10000 }).toString();
 
-  signupTab.addEventListener('click', () => {
-    signupTab.style.color = '#00875f';
-    loginTab.style.color = '#a8a8b3';
-    signupView.style.display = 'block';
-    loginView.style.display = 'none';
-  });
-</script>
-
-
-    <script>
-        
-          // Guest login navigation handler route
-  document.getElementById('guest-login-btn').addEventListener('click', (event) => {
-    event.preventDefault(); // Blocks the link from refreshing the screen
-    
-    // Generate a quick random ID so guest heartbeats don't overwrite each other
-    const guestId = 'guest_' + Math.floor(Math.random() * 100000);
-    
-    // Save to localStorage so your system remembers they are in a local session
-    localStorage.setItem("rememberedUser", JSON.stringify({ 
-      username: guestId, 
-      gmail: 'guest@app.local', 
-      dob: '2000-01-01'
-    }));
-
-    
-    // Instantly hide the full-screen modal layer to show your underlying website application
-    document.querySelector('.form-container').style.display = 'none';
-    
-    // Safely fire your 1-minute tracking interval function on the guest profile node
-    if (typeof startRESTHeartbeat === "function") {
-      startRESTHeartbeat(guestId);
-    }
-  });
-// --- Settings View Controller Module ---
-window.addEventListener('DOMContentLoaded', () => {
-  // 1. Local Profile Detection Engine
-  const savedData = localStorage.getItem("rememberedUser");
-  if (savedData) {
-    const user = JSON.parse(savedData);
-    const nameDisplay = document.getElementById('settings-username');
-    if (nameDisplay) {
-      nameDisplay.textContent = user.username;
-    }
-  }
-
-  // 2. Password Visibility Handler Routine
-  const passwordInput = document.getElementById('settings-password');
-  const toggleBtn = document.getElementById('toggle-settings-password');
-
-  if (toggleBtn && passwordInput) {
-    toggleBtn.addEventListener('click', () => {
-      if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        toggleBtn.textContent = 'HIDE';
-        toggleBtn.style.color = '#00875f';
-      } else {
-        passwordInput.type = 'password';
-        toggleBtn.textContent = 'SHOW';
-        toggleBtn.style.color = '#a8a8b3';
-      }
-    });
-  }
-
-    // 3. UI Slider Control Sync Hooks (Fixed Brightness Inversion)
-  const brightInput = document.getElementById('setting-brightness');
-  const brightVal = document.getElementById('brightness-val');
-  if (brightInput && brightVal) {
-    brightInput.addEventListener('input', (e) => {
-      const sliderValue = parseInt(e.target.value);
-      
-      // Reverses the logic: 110 - sliderValue maps high values to high opacity
-      const invertedOpacity = (110 - sliderValue) / 100;
-      
-      brightVal.textContent = sliderValue + '%';
-      
-      // Applies the corrected reversed brightness layer cleanly
-      document.body.style.opacity = invertedOpacity;
-    });
-  }
-
-
-  const soundInput = document.getElementById('setting-sound');
-  const soundVal = document.getElementById('sound-val');
-  if (soundInput && soundVal) {
-    soundInput.addEventListener('input', (e) => {
-      soundVal.textContent = e.target.value + '%';
-    });
-  }
-});
-
-let found = null;
-let look = null;
-let currentTab = "dashboard";
-
-// Changed "art" to "qr" so routing, tabs, and search look for the new element IDs
-const menus = ["dashboard", "settings", "qr", "molcular-science", "code-advice", "memes"];
-
-
-                                        const colors = { 
-    "4": "#111111",  // Black
-    "8": "#FFFFFF", // White
-    "5": "#F5F5F5" //off white
-};
-
-// Fixed 32x32 Matrix: Restored original data with corrected QR finder patterns
-const smily_face_emoji = [
-    "4","4","4","4","4","4","4","8","4","8","4","4","8","8","4","8","4","8","8","4","4","8","8","4","8","4","4","4","4","4","4","4",
-    "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","4","8","4","8","8","8","8","8","4",
-    "4","5","4","4","4","8","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
-    "4","5","4","4","4","8","4","8","4","4","8","8","8","8","4","8","8","8","4","4","4","8","8","4","8","4","8","4","4","4","8","4",
-    "4","8","4","4","4","8","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
-    "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","4","8","4","8","8","8","8","8","4",
-    "4","4","4","4","4","4","4","8","4","8","4","8","4","8","4","8","4","8","4","8","4","8","4","8","4","4","4","4","4","4","4","4",
-    "8","8","8","8","8","8","8","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","8","8","8","8","8","8","8",
-    "8","4","8","4","4","8","4","4","8","8","4","4","8","4","8","4","4","4","4","8","4","4","4","8","4","4","4","8","8","4","4","8",
-    "4","4","4","8","8","4","8","4","4","8","4","8","4","8","4","8","4","4","8","8","4","4","8","4","8","8","8","4","4","8","4","8",
-    "4","8","8","4","8","4","4","8","8","4","8","4","8","4","4","4","8","4","4","4","8","4","8","8","4","4","4","8","4","8","4","4",
-    "4","8","4","4","4","4","8","8","4","4","8","8","8","8","8","8","4","4","8","4","4","8","4","4","8","4","8","4","8","8","4","8",
-    "4","8","4","4","4","8","4","8","4","8","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4",
-    "4","8","8","8","8","8","8","8","8","4","4","8","8","4","8","4","8","8","4","4","8","4","4","8","4","4","4","8","4","8","4","8",
-    "4","4","4","4","4","4","4","8","4","8","4","8","4","4","8","8","4","8","4","8","8","4","8","4","4","8","8","4","4","8","8","4",
-    "8","8","8","8","8","8","8","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","8","8","4","8",
-    "8","4","8","4","4","8","4","4","8","8","4","4","8","4","8","4","4","4","4","8","4","4","4","8","4","4","4","8","8","4","4","8",
-    "4","4","4","8","8","4","8","4","4","8","4","8","4","8","4","8","4","4","8","8","4","4","8","4","8","8","8","4","4","8","4","8",
-    "4","8","8","4","8","4","4","8","8","4","8","4","8","4","4","4","8","4","4","4","8","4","8","8","4","4","4","8","4","8","4","4",
-    "4","8","4","4","4","4","8","8","4","4","8","8","8","8","8","8","4","4","8","4","4","8","4","4","8","4","8","4","8","8","4","8",
-    "4","8","4","4","4","8","4","8","4","8","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4",
-    "4","4","4","4","4","4","8","8","4","8","4","8","4","4","8","8","4","8","4","8","8","4","8","4","4","4","4","4","4","4","4","4",
-    "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","8","4","8","8","8","8","8","8","4",
-    "4","8","4","4","4","8","8","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
-    "8","8","8","8","8","8","4","8","4","4","8","8","8","8","4","8","8","8","4","4","4","8","8","4","8","4","8","4","4","4","8","4",
-    "4","4","4","4","4","4","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
-    "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","8","4","8","8","8","8","8","8","4",
-    "4","8","4","4","4","8","4","8","4","8","4","8","4","4","8","8","4","8","4","8","8","4","8","4","4","4","4","4","4","4","4","4",
-    "4","8","4","4","4","8","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","8","8","4","8",
-    "4","8","4","4","4","8","4","8","8","4","4","8","4","4","4","4","8","4","4","4","8","4","4","4","8","8","4","4","8","4","4","8",
-    "4","8","8","8","8","8","4","8","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4",
-    "4","4","4","4","4","4","4","8","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4","4"
-];
-
-
-
-
-        function SwitchTab(newtab) { 
-            menus.forEach(m => {
-                const element = document.getElementById(m);
-                if (element) {
-                    element.classList.remove('active');
-                }
-                const btn = document.getElementById('btn-' + m);
-                if (btn) {
-                    btn.classList.remove('active');
-                }
-            });
-            
-            const targetElement = document.getElementById(newtab);
-            const targetBtn = document.getElementById('btn-' + newtab);
-            
-            if (targetElement) {
-                targetElement.classList.add('active');
-                currentTab = newtab;
-            }
-            if (targetBtn) {
-                targetBtn.classList.add('active');
-            }
-        }
-
-        function Search() {
-            let searchVal = document.getElementById('find').value.toLowerCase().trim();
-            if (searchVal === "") return;
-
-            let matchedTab = menus.find(menu => {
-                let menuIdx = 0;
-                for (let char of searchVal) {
-                    menuIdx = menu.indexOf(char, menuIdx);
-                    if (menuIdx === -1) return false;
-                    menuIdx++;
-                }
-                return true;
-            });
-
-            if (matchedTab) {
-                SwitchTab(matchedTab);
-            }
-        }
-        // 1. Update the menus array at the top so SwitchTab() and Search() know it exists
-
-// 2. Add this generator function to the very bottom of your script
-function drawPixelArt() {
-    const canvas = document.getElementById('pixel-canvas');
-    if (!canvas) return;
-    
-    // Clear out existing content first just in case
-    canvas.innerHTML = ''; 
-    
-    smily_face_emoji.forEach(colorIndex => {
-        const pixel = document.createElement('div');
-        pixel.classList.add('pixel');
-        pixel.style.backgroundColor = colors[colorIndex];
-        canvas.appendChild(pixel);
-    });
+async function getUser(u) {
+  const r = await fetch(`${DB}/${encodeURIComponent(u)}${KEY}`);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("read " + r.status);
+  const f = (await r.json()).fields || {};
+  return { salt: f.salt?.stringValue, hash: f.passwordHash?.stringValue };
 }
 
-window.addEventListener('DOMContentLoaded', drawPixelArt);
-    </script>
-    <script>
-  // Interface Visual Control
-  document.getElementById('signup-form').addEventListener('submit', () => {
-    const ssnField = document.getElementById('ssn');
-    if (ssnField && ssnField.value) {
-      // Instantly wipes the joke input value from the UI layout after submission
-      setTimeout(() => { ssnField.value = ''; }, 1000);
+async function saveUser(u, p) {
+  const f = {
+    username: { stringValue: u },
+    age: { stringValue: p.age },
+    salt: { stringValue: p.salt },
+    passwordHash: { stringValue: p.hash }
+  };
+  if (p.age !== "1") { // under-13: no email, no birthday stored
+    f.gmail = { stringValue: p.gmail };
+    f.dob = { stringValue: p.dob };
+  }
+  const r = await fetch(`${DB}/${encodeURIComponent(u)}${KEY}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields: f })
+  });
+  if (!r.ok) throw new Error("write " + r.status);
+}
+
+let beat = null;
+function heartbeat(u) {
+  clearInterval(beat);
+  const url = `https://${CFG.projectId}-default-rtdb.firebaseio.com/presence/${encodeURIComponent(u)}.json`;
+  const ping = () => fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "online", lastPing: Date.now() }) }).catch(() => {});
+  ping();
+  beat = setInterval(ping, 60000);
+}
+
+function tier(dob) {
+  if (!dob) return null;
+  const [y, m, d] = dob.split("-").map(Number);
+  const b = new Date(y, m - 1, d), t = new Date();
+  if (isNaN(b) || b > t) return null;
+  let age = t.getFullYear() - y;
+  if (t.getMonth() < m - 1 || (t.getMonth() === m - 1 && t.getDate() < d)) age--;
+  return age < 13 ? "1" : age <= 17 ? "2" : age <= 20 ? "3" : "4";
+}
+
+/* ---------- login screen ---------- */
+const err = m => { $("err").textContent = m || ""; };
+
+function enter(u) {
+  $("gate").classList.add("hide");
+  $("who").textContent = u;
+  heartbeat(u);
+}
+
+function showTab(login) {
+  $("t-login").classList.toggle("on", login);
+  $("t-signup").classList.toggle("on", !login);
+  $("login-form").classList.toggle("hide", !login);
+  $("signup-form").classList.toggle("hide", login);
+  err("");
+}
+$("t-login").onclick = () => showTab(true);
+$("t-signup").onclick = () => showTab(false);
+
+document.querySelectorAll("[data-show]").forEach(b => b.onclick = () => {
+  const i = $(b.dataset.show), show = i.type === "password";
+  i.type = show ? "text" : "password";
+  b.textContent = show ? "Hide" : "Show";
+});
+
+$("su-dob").addEventListener("input", () => {
+  const kid = tier($("su-dob").value) === "1";
+  $("mailrow").classList.toggle("hide", kid);
+  $("kidnote").classList.toggle("hide", !kid);
+  $("su-mail").required = !kid;
+  if (kid) $("su-mail").value = "";
+});
+
+$("signup-form").addEventListener("submit", async e => {
+  e.preventDefault(); err("");
+  const u = $("su-user").value.trim(), dob = $("su-dob").value, pw = $("su-pass").value;
+  const age = tier(dob);
+  if (!age) return err("Enter a valid birth date that isn't in the future.");
+  if (pw.length < 6) return err("Use a password with at least 6 characters.");
+  const btn = e.submitter; btn.disabled = true;
+  try {
+    if (await getUser(u)) return err("That username is taken. Try another one.");
+    const salt = CryptoJS.lib.WordArray.random(16).toString();
+    await saveUser(u, { age, salt, hash: hash(pw, salt), gmail: $("su-mail").value, dob });
+    localStorage.setItem("lastUser", u);
+    $("su-dob").value = ""; $("su-mail").value = ""; // don't leave them in the form
+    enter(u);
+  } catch (x) {
+    console.error(x);
+    err("Couldn't create the account. Check your connection and try again.");
+  } finally { btn.disabled = false; }
+});
+
+$("login-form").addEventListener("submit", async e => {
+  e.preventDefault(); err("");
+  const u = $("li-user").value.trim(), pw = $("li-pass").value;
+  const btn = e.submitter; btn.disabled = true;
+  try {
+    const user = await getUser(u);
+    if (!user || hash(pw, user.salt) !== user.hash) return err("Wrong username or password.");
+    localStorage.setItem("lastUser", u);
+    enter(u);
+  } catch (x) {
+    console.error(x);
+    err("Couldn't log in. Check your connection and try again.");
+  } finally { btn.disabled = false; }
+});
+
+$("guest").onclick = e => { e.preventDefault(); enter("guest_" + Math.floor(Math.random() * 100000)); };
+$("logout").onclick = () => { clearInterval(beat); location.reload(); };
+$("li-user").value = localStorage.getItem("lastUser") || ""; // prefill only; password always required
+
+/* decorative grape bunch */
+[[-84,0],[-28,0],[28,0],[-56,50],[0,50],[56,50],[-28,100],[28,100],[0,150]].forEach(([x, y]) => {
+  const g = document.createElement("i");
+  g.style.left = x - 28 + "px"; g.style.top = y + "px";
+  $("bunch").appendChild(g);
+});
+
+/* ---------- tabs & search ---------- */
+const tabs = [...document.querySelectorAll(".side-item")];
+function switchTab(id) {
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === id));
+  tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === id));
+}
+tabs.forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+function search() {
+  const q = $("find").value.toLowerCase().trim();
+  const hit = q && tabs.find(b => b.textContent.toLowerCase().includes(q));
+  if (hit) switchTab(hit.dataset.tab);
+}
+$("find-btn").onclick = search;
+$("find").addEventListener("keydown", e => { if (e.key === "Enter") search(); });
+
+/* ---------- settings ---------- */
+$("bright").oninput = e => {
+  $("bright-v").textContent = e.target.value + "%";
+  $("dim").style.opacity = (100 - e.target.value) / 100 * 0.85;
+};
+$("sound").oninput = e => { $("sound-v").textContent = e.target.value + "%"; };
+
+/* ---------- pixel art ---------- */
+const ART = [
+"44444448484488484884488484444444","48888848884884848844844484888884","45444848448884484884484484844484","45444848448888488844488484844484",
+"48444848448884484884484484844484","48888848884884848844844484888884","44444448484848484848484844444444","88888888448884484884484488888888",
+"84844844884484844448444844488448","44488484484848484488448488844848","48848448848484448444848844484844","48444488448888884484484484848848",
+"48444848484444444444444444444444","48888888844884848844844844484848","44444448484844884848848448844884","88888888448884484884484484848848",
+"84844844884484844448444844488448","44488484484848484488448488844848","48848448848484448444848844484844","48444488448888884484484484848848",
+"48444848484444444444444444444444","44444488484844884848848444444444","48888848884884848844844848888884","48444888448884484884484484844484",
+"88888848448888488844488484844484","44444448448884484884484484844484","48888848884884848844844848888884","48444848484844884848848444444444",
+"48444848448884484884484484848848","48444848844844448444844488448448","48888848444444444444444444444444","44444448444444444444444444444444"];
+const COL = { 4: "#111", 8: "#fff", 5: "#f5f5f5" };
+ART.join("").split("").forEach(c => {
+  const p = document.createElement("div");
+  p.style.background = COL[c];
+  $("pixels").appendChild(p);
+});
+$("dl").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["Just kidding. Nothing to see here.\n"], { type: "text/plain" }));
+  a.download = "ThisIsNotVirus.exe.txt";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+/* ---------- code advice ---------- */
+const SKELETON = `&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;title&gt;My Page&lt;/title&gt;
+  &lt;style&gt;
+    body { background-color: #f5f5f5; }
+    .btn { background-color: #00ff00; height: 50px; width: 80px; }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;button class="btn" onclick="addPoop()"&gt;poopysa buttcheek&lt;/button&gt;
+  &lt;script&gt;
+    let poop = 0;
+    function addPoop() {
+      poop += 7;
     }
-  });
-</script>
-    <script>
-  // Simple view switcher logic toggling visibility layout attributes
-  const loginTab = document.getElementById('tab-login');
-  const signupTab = document.getElementById('tab-signup');
-  const loginView = document.getElementById('login-view');
-  const signupView = document.getElementById('signup-view');
-
-  loginTab.addEventListener('click', () => {
-    loginTab.classList.add('active');
-    signupTab.classList.remove('active');
-    loginView.classList.add('active');
-    signupView.classList.remove('active');
-  });
-
-  signupTab.addEventListener('click', () => {
-    signupTab.classList.add('active');
-    loginTab.classList.remove('active');
-    signupView.classList.add('active');
-    loginView.classList.remove('active');
-  });
-</script>
-<script>
-const scene = new THREE.Scene();
-
-            
-            scene.background = new THREE.Color(0x87ceeb); 
-            scene.fog = new THREE.FogExp2(0x87ceeb, 0.02);
-
-            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            
-            const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFShadowMap; // Much faster, slightly harder edges
-
-            renderer.toneMapping = THREE.LinearToneMapping;
-            renderer.toneMappingExposure = 1.0;
-            container.appendChild(renderer.domElement);
-
-            updateDynamicDeviceTime();
-            setInterval(updateDynamicDeviceTime, 1000);
-const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Shift: false, Space: false, c: false };
-const sunGeometry = new THREE.SphereGeometry(3.5, 32, 32); const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xfffcd0 });
-
-            const sunVisualMesh = new THREE.Mesh(sunGeometry, sunMaterial); sunVisualMesh.position.set(30, 50, -50); scene.add(sunVisualMesh);
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;`;
+$("skeleton").textContent = SKELETON;
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(SKELETON); $("copy").textContent = "Copied"; }
+  catch { $("copy").textContent = "Press Ctrl+C"; }
+  setTimeout(() => $("copy").textContent = "Copy", 1500);
+};
 </script>
 </body>
 </html>
