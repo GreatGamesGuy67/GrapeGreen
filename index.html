@@ -75,6 +75,9 @@ table{border-collapse:collapse;width:100%;max-width:760px;background:#fff;margin
 td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14px}
 .adm{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .adm input{padding:8px;border:2px solid var(--line);border-radius:8px}
+.kidbox{display:inline-block;position:relative;width:150px;height:22px;background:var(--leaf);border-radius:6px;vertical-align:middle;cursor:help}
+.kidbox::after{content:attr(data-tip);position:absolute;left:110%;top:50%;transform:translateY(-50%);background:var(--ink);color:#fff;font-size:12px;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:5}
+.kidbox:hover::after,.kidbox:focus::after{opacity:1}
 @media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}}
 </style>
 </head>
@@ -456,13 +459,30 @@ function ping() {
 let lastMsgs = [], seen = 0, lastSend = 0;
 function render() {
   const box = $("msgs"), near = box.scrollHeight - box.scrollTop - box.clientHeight < 60, ts = $("ts").checked;
-  box.innerHTML = lastMsgs.length ? lastMsgs.map(m => `<p class="msg">${ts ? `<small>${new Date(m.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small> ` : ""}<b>${esc(m.u)}</b>${m.r === "owner" || m.r === "admin" ? `<span class="tag">${m.r}</span>` : ""}: ${fmt(m.x)}</p>`).join("") : '<p class="mute">No messages yet. Say hi!</p>';
+  const kidViewer = me.age === "1";
+  const html = lastMsgs.map(m => {
+    const kidMsg = m.k === "1";
+    if (kidViewer && !kidMsg) return ""; // kids only see other kids
+    if (kidMsg && !kidViewer && !isAdmin()) return '<p class="msg"><span class="kidbox" tabindex="0" title="Only kids can see this" data-tip="Only kids can see this"></span></p>';
+    const del = isAdmin() ? ` <a href="#" data-del="${esc(m.id)}" class="mute">delete</a>` : "";
+    const time = ts ? `<small>${new Date(m.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small> ` : "";
+    const tag = m.r === "owner" || m.r === "admin" ? `<span class="tag">${m.r}</span>` : kidMsg ? '<span class="tag">kid</span>' : "";
+    return `<p class="msg">${time}<b>${esc(m.u)}</b>${tag}: ${fmt(m.x)}${del}</p>`;
+  }).join("");
+  box.innerHTML = html || '<p class="mute">No messages yet. Say hi!</p>';
   if (near) box.scrollTop = box.scrollHeight;
 }
+$("msgs").addEventListener("click", async e => {
+  const id = e.target.dataset.del;
+  if (!id) return;
+  e.preventDefault();
+  if (!isAdmin()) return;
+  try { await fetch(`${ROOT}/chat/${encodeURIComponent(id)}${KEY}`, { method: "DELETE" }); pollChat(); } catch {}
+});
 async function pollChat() {
   try {
     const r = await fetch(`${ROOT}/chat${KEY}&orderBy=t%20desc&pageSize=60`);
-    lastMsgs = ((await r.json()).documents || []).map(d => { const o = parseDoc(d); return { u: o.u, x: o.x, r: o.r, t: o.t }; }).reverse();
+    lastMsgs = ((await r.json()).documents || []).map(d => { const o = parseDoc(d); return { id: o.id, u: o.u, x: o.x, r: o.r, k: o.k, t: o.t }; }).reverse();
     const n = lastMsgs[lastMsgs.length - 1];
     if (n && seen && n.t > seen && n.u !== me.name) ping();
     if (n) seen = n.t;
@@ -471,7 +491,6 @@ async function pollChat() {
 }
 function startChat() {
   setInterval(watch, 30000);
-  if (me.age === "1") { $("chat-box").classList.add("hide"); $("chat-off").classList.remove("hide"); return; }
   const guest = me.role === "guest";
   $("chat-in").disabled = guest;
   $("chat-in").placeholder = guest ? "Log in to send messages (guests are read-only)" : "Say something...";
@@ -480,14 +499,17 @@ function startChat() {
 $("chat-form").addEventListener("submit", async e => {
   e.preventDefault();
   const x = $("chat-in").value.trim().slice(0, 500);
-  if (!x || me.role === "guest" || me.age === "1" || Date.now() - lastSend < 1500) return;
+  if (!x || me.role === "guest" || Date.now() - lastSend < 1500) return;
+  const kid = me.age === "1";
+  // kids can't post links, emails or phone numbers
+  const clean = kid ? x.replace(/https?:\/\/\S+|www\.\S+|\S+@\S+|(?:\d[\s.\-]?){7,}/gi, "[removed]") : x;
   lastSend = Date.now();
   try {
     const d = await getUser(me.name);
     if (!d || d.deletedAt || banLeft(d)) return watch();
     $("chat-in").value = "";
     await fetch(`${ROOT}/chat${KEY}`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fields: { u: { stringValue: me.name }, x: { stringValue: x }, r: { stringValue: me.role }, t: { integerValue: String(Date.now()) } } }) });
+      body: JSON.stringify({ fields: { u: { stringValue: me.name }, x: { stringValue: clean }, k: { stringValue: kid ? "1" : "0" }, r: { stringValue: me.role }, t: { integerValue: String(Date.now()) } } }) });
     pollChat();
   } catch { alert("Message didn't send. Try again."); }
 });
