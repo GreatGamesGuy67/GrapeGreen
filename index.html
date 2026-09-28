@@ -65,6 +65,16 @@ main{margin:50px 0 0 180px;padding:24px}
 .guest{display:block;text-align:center;margin-top:16px;color:var(--mute);font-size:14px}
 #err{min-height:20px;margin-top:12px;color:#c62828;font-size:14px}
 .hide{display:none!important}
+#msgs{height:52vh;max-width:760px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:15px}
+.msg{margin:0 0 8px;word-break:break-word}.msg small{color:var(--mute)}
+.tag{background:var(--leaf);border-radius:6px;padding:0 6px;font-size:11px;margin-left:4px}
+.hid{background:#ede4fa;border-radius:4px;padding:0 3px}
+#chat-form{display:flex;gap:8px;margin-top:10px;max-width:760px}
+#chat-form input{flex:1;padding:10px;border:2px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;max-width:760px;background:#fff;margin-bottom:12px}
+td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14px}
+.adm{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.adm input{padding:8px;border:2px solid var(--line);border-radius:8px}
 @media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}}
 </style>
 </head>
@@ -119,6 +129,8 @@ main{margin:50px 0 0 180px;padding:24px}
   <button class="side-item" data-tab="science">Atomic science</button>
   <button class="side-item" data-tab="code">Coding advice</button>
   <button class="side-item" data-tab="memes">Wall of memes</button>
+  <button class="side-item" data-tab="chat">Chat</button>
+  <button class="side-item hide" id="nav-admin" data-tab="admin">Admin panel</button>
 </nav>
 
 <main>
@@ -136,7 +148,11 @@ main{margin:50px 0 0 180px;padding:24px}
         <input id="bright" type="range" min="10" max="100" value="100"></div>
       <div class="row"><label for="sound"><span>Sound volume</span><span id="sound-v">80%</span></label>
         <input id="sound" type="range" min="0" max="100" value="80"></div>
+      <div class="row"><label for="fsize"><span>Chat text size</span><span id="fsize-v">15px</span></label>
+        <input id="fsize" type="range" min="12" max="22" value="15"></div>
+      <label class="row" style="flex-direction:row;align-items:center;gap:8px"><input id="ts" type="checkbox" checked> Show chat timestamps</label>
       <button class="btn red" id="logout">Log out</button>
+      <button class="btn red" id="del" style="margin-left:8px">Delete account</button>
     </div>
   </section>
 
@@ -168,6 +184,30 @@ main{margin:50px 0 0 180px;padding:24px}
     <div class="doc"><button class="btn" id="copy">Copy</button><pre id="skeleton"></pre></div>
   </section>
 
+  <section id="chat" class="view">
+    <h1>Global chat</h1>
+    <p class="mute">**bold** __underline__ *italic* ~~strike~~ {hidden from guests}</p>
+    <div id="chat-off" class="mute hide">Chat isn't available for accounts under 13.</div>
+    <div id="chat-box"><div id="msgs"></div>
+      <form id="chat-form"><input id="chat-in" maxlength="500" autocomplete="off" placeholder="Say something..."><button class="btn">Send</button></form></div>
+  </section>
+
+  <section id="admin" class="view">
+    <h1>Admin panel</h1>
+    <div class="adm">
+      <input id="a-user" placeholder="Username">
+      <input id="a-hours" type="number" min="1" placeholder="Ban hours">
+      <button class="btn" data-a="ban">Ban (hours)</button>
+      <button class="btn red" data-a="perm">Perm ban</button>
+      <button class="btn" data-a="unban">Unban</button>
+      <button class="btn" data-a="promote">Promote to admin</button>
+      <button class="btn" data-a="demote">Demote</button>
+    </div>
+    <div id="a-msg" class="mute"></div>
+    <h3>Users</h3><div id="a-users"></div>
+    <div id="a-binbox"><h3>Bin (kept 90 days)</h3><div id="a-bin"></div></div>
+  </section>
+
   <section id="memes" class="view">
     <h1>Wall of memes</h1>
     <p class="mute">Take nothing personal</p>
@@ -191,8 +231,9 @@ async function getUser(u) {
   const r = await fetch(`${DB}/${encodeURIComponent(u)}${KEY}`);
   if (r.status === 404) return null;
   if (!r.ok) throw new Error("read " + r.status);
-  const f = (await r.json()).fields || {};
-  return { salt: f.salt?.stringValue, hash: f.passwordHash?.stringValue };
+  const o = parseDoc(await r.json());
+  if (o.deletedAt && o.purgeAt < Date.now()) { fetch(`${DB}/${encodeURIComponent(u)}${KEY}`, { method: "DELETE" }); return null; }
+  return o;
 }
 
 async function saveUser(u, p) {
@@ -200,7 +241,8 @@ async function saveUser(u, p) {
     username: { stringValue: u },
     age: { stringValue: p.age },
     salt: { stringValue: p.salt },
-    passwordHash: { stringValue: p.hash }
+    passwordHash: { stringValue: p.hash },
+    role: { stringValue: p.role }
   };
   if (p.age !== "1") { // under-13: no email, no birthday stored
     f.gmail = { stringValue: p.gmail };
@@ -235,10 +277,15 @@ function tier(dob) {
 /* ---------- login screen ---------- */
 const err = m => { $("err").textContent = m || ""; };
 
-function enter(u) {
+let me = { name: "", role: "guest", age: "" };
+function enter(u, d) {
+  me = { name: u, role: d ? d.role || "user" : "guest", age: d ? d.age || "" : "" };
   $("gate").classList.add("hide");
   $("who").textContent = u;
+  $("nav-admin").classList.toggle("hide", !isAdmin());
+  $("del").classList.toggle("hide", me.role === "guest");
   heartbeat(u);
+  startChat();
 }
 
 function showTab(login) {
@@ -275,10 +322,11 @@ $("signup-form").addEventListener("submit", async e => {
   try {
     if (await getUser(u)) return err("That username is taken. Try another one.");
     const salt = CryptoJS.lib.WordArray.random(16).toString();
-    await saveUser(u, { age, salt, hash: hash(pw, salt), gmail: $("su-mail").value, dob });
+    const role = u === OWNER ? "owner" : "user";
+    await saveUser(u, { age, salt, hash: hash(pw, salt), gmail: $("su-mail").value, dob, role });
     localStorage.setItem("lastUser", u);
     $("su-dob").value = ""; $("su-mail").value = ""; // don't leave them in the form
-    enter(u);
+    enter(u, { role, age });
   } catch (x) {
     console.error(x);
     err("Couldn't create the account. Check your connection and try again.");
@@ -292,8 +340,10 @@ $("login-form").addEventListener("submit", async e => {
   try {
     const user = await getUser(u);
     if (!user || hash(pw, user.salt) !== user.hash) return err("Wrong username or password.");
+    if (user.deletedAt) return err("This account was deleted. Ask an admin to restore it.");
+    if (banLeft(user)) return err("This account is " + banText(user) + ".");
     localStorage.setItem("lastUser", u);
-    enter(u);
+    enter(u, user);
   } catch (x) {
     console.error(x);
     err("Couldn't log in. Check your connection and try again.");
@@ -314,6 +364,8 @@ $("li-user").value = localStorage.getItem("lastUser") || ""; // prefill only; pa
 /* ---------- tabs & search ---------- */
 const tabs = [...document.querySelectorAll(".side-item")];
 function switchTab(id) {
+  if (id === "admin" && !isAdmin()) return;
+  if (id === "admin") loadAdmin();
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === id));
   tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === id));
 }
@@ -357,27 +409,174 @@ $("dl").onclick = () => {
   URL.revokeObjectURL(a.href);
 };
 
+/* ---------- accounts, chat & admin ---------- */
+const OWNER = "MattyGrapeGreenOwner"; // register this name first; the owner role is granted at sign-up
+const ROOT = DB.slice(0, -6);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const isAdmin = () => me.role === "admin" || me.role === "owner";
+const banLeft = d => d.banUntil === -1 ? Infinity : Math.max(0, (d.banUntil || 0) - Date.now());
+const banText = d => banLeft(d) === Infinity ? "permanently banned" : `banned for ${Math.ceil(banLeft(d) / 36e5)} more hour(s)`;
+
+function parseDoc(doc) {
+  const o = { id: decodeURIComponent(doc.name.split("/").pop()) }, f = doc.fields || {};
+  for (const k in f) { const v = f[k]; o[k] = v.stringValue ?? (v.integerValue !== undefined ? Number(v.integerValue) : v.booleanValue); }
+  o.hash = o.passwordHash;
+  return o;
+}
+
+async function patch(u, set, unset = []) {
+  const mask = [...Object.keys(set), ...unset].map(k => "&updateMask.fieldPaths=" + k).join("");
+  const fields = {};
+  for (const k in set) { const v = set[k]; fields[k] = typeof v === "number" ? { integerValue: String(v) } : typeof v === "boolean" ? { booleanValue: v } : { stringValue: v }; }
+  const r = await fetch(`${DB}/${encodeURIComponent(u)}${KEY}${mask}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields }) });
+  if (!r.ok) throw new Error("patch " + r.status);
+}
+
+async function watch() { // every 30s: kick out banned/deleted users, sync role changes
+  if (me.role === "guest") return;
+  try {
+    const d = await getUser(me.name);
+    const bad = !d ? "no longer exists" : d.deletedAt ? "deleted" : banLeft(d) ? banText(d) : "";
+    if (bad) { alert("Your account is " + bad + "."); return location.reload(); }
+    if ((d.role || "user") !== me.role) { me.role = d.role || "user"; $("nav-admin").classList.toggle("hide", !isAdmin()); }
+  } catch {}
+}
+
+/* chat */
+function fmt(text) {
+  let s = esc(text);
+  s = s.replace(/\{(.+?)\}/g, (_, t) => me.role === "guest" ? "\u2588".repeat(Array.from(t).length) : `<span class="hid">${t}</span>`);
+  return s.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/__(.+?)__/g, "<u>$1</u>").replace(/\*(.+?)\*/g, "<i>$1</i>").replace(/~~(.+?)~~/g, "<s>$1</s>");
+}
+function ping() {
+  const v = $("sound").value / 100; if (!v) return;
+  try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain();
+    o.frequency.value = 660; g.gain.value = v * .15; o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + .12); } catch {}
+}
+let lastMsgs = [], seen = 0, lastSend = 0;
+function render() {
+  const box = $("msgs"), near = box.scrollHeight - box.scrollTop - box.clientHeight < 60, ts = $("ts").checked;
+  box.innerHTML = lastMsgs.length ? lastMsgs.map(m => `<p class="msg">${ts ? `<small>${new Date(m.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small> ` : ""}<b>${esc(m.u)}</b>${m.r === "owner" || m.r === "admin" ? `<span class="tag">${m.r}</span>` : ""}: ${fmt(m.x)}</p>`).join("") : '<p class="mute">No messages yet. Say hi!</p>';
+  if (near) box.scrollTop = box.scrollHeight;
+}
+async function pollChat() {
+  try {
+    const r = await fetch(`${ROOT}/chat${KEY}&orderBy=t%20desc&pageSize=60`);
+    lastMsgs = ((await r.json()).documents || []).map(d => { const o = parseDoc(d); return { u: o.u, x: o.x, r: o.r, t: o.t }; }).reverse();
+    const n = lastMsgs[lastMsgs.length - 1];
+    if (n && seen && n.t > seen && n.u !== me.name) ping();
+    if (n) seen = n.t;
+    render();
+  } catch {}
+}
+function startChat() {
+  setInterval(watch, 30000);
+  if (me.age === "1") { $("chat-box").classList.add("hide"); $("chat-off").classList.remove("hide"); return; }
+  const guest = me.role === "guest";
+  $("chat-in").disabled = guest;
+  $("chat-in").placeholder = guest ? "Log in to send messages (guests are read-only)" : "Say something...";
+  pollChat(); setInterval(pollChat, 4000);
+}
+$("chat-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const x = $("chat-in").value.trim().slice(0, 500);
+  if (!x || me.role === "guest" || me.age === "1" || Date.now() - lastSend < 1500) return;
+  lastSend = Date.now();
+  try {
+    const d = await getUser(me.name);
+    if (!d || d.deletedAt || banLeft(d)) return watch();
+    $("chat-in").value = "";
+    await fetch(`${ROOT}/chat${KEY}`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { u: { stringValue: me.name }, x: { stringValue: x }, r: { stringValue: me.role }, t: { integerValue: String(Date.now()) } } }) });
+    pollChat();
+  } catch { alert("Message didn't send. Try again."); }
+});
+$("fsize").oninput = e => { $("fsize-v").textContent = e.target.value + "px"; $("msgs").style.fontSize = e.target.value + "px"; localStorage.setItem("fsize", e.target.value); };
+$("ts").onchange = render;
+const fs0 = localStorage.getItem("fsize");
+if (fs0) { $("fsize").value = fs0; $("fsize").oninput({ target: $("fsize") }); }
+
+/* delete account -> bin for 90 days */
+$("del").onclick = async () => {
+  if (me.role === "guest") return;
+  if (me.role === "owner") return alert("The owner account can't be deleted.");
+  const pw = prompt("Type your password to delete your account. It stays in a bin for 90 days, then it's gone for good.");
+  if (pw === null) return;
+  try {
+    const d = await getUser(me.name);
+    if (!d || hash(pw, d.salt) !== d.hash) return alert("Wrong password.");
+    await patch(me.name, { deletedAt: Date.now(), purgeAt: Date.now() + 90 * 864e5 });
+    location.reload();
+  } catch { alert("Couldn't delete the account. Try again."); }
+};
+
+/* admin panel */
+let users = [];
+async function loadAdmin() {
+  $("a-binbox").classList.toggle("hide", me.role !== "owner");
+  try {
+    const r = await fetch(`${DB}${KEY}&pageSize=300`);
+    users = ((await r.json()).documents || []).map(parseDoc);
+  } catch { $("a-msg").textContent = "Couldn't load users."; return; }
+  const now = Date.now();
+  users.filter(u => u.deletedAt && u.purgeAt < now).forEach(u => fetch(`${DB}/${encodeURIComponent(u.id)}${KEY}`, { method: "DELETE" }));
+  users = users.filter(u => !(u.deletedAt && u.purgeAt < now));
+  const live = users.filter(u => !u.deletedAt), bin = users.filter(u => u.deletedAt);
+  $("a-users").innerHTML = "<table><tr><th>User</th><th>Role</th><th>Status</th></tr>" + live.map(u =>
+    `<tr><td><a href="#" data-pick="${esc(u.id)}">${esc(u.id)}</a></td><td>${esc(u.role || "user")}</td><td>${banLeft(u) ? banText(u) : "active"}</td></tr>`).join("") + "</table>";
+  $("a-bin").innerHTML = bin.length ? "<table><tr><th>User</th><th>Days left</th><th></th></tr>" + bin.map(u =>
+    `<tr><td>${esc(u.id)}</td><td>${Math.ceil((u.purgeAt - now) / 864e5)}</td><td><button class="btn" data-restore="${esc(u.id)}">Restore</button>${u.extUsed ? "" : ` <button class="btn" data-ext="${esc(u.id)}">+7 days</button>`}</td></tr>`).join("") + "</table>" : '<p class="mute">The bin is empty.</p>';
+}
+$("admin").addEventListener("click", async e => {
+  const t = e.target, msg = m => { $("a-msg").textContent = m; };
+  if (t.dataset.pick) { e.preventDefault(); $("a-user").value = t.dataset.pick; return; }
+  if (!isAdmin()) return;
+  try {
+    if (t.dataset.restore || t.dataset.ext) {
+      if (me.role !== "owner") return;
+      if (t.dataset.restore) { await patch(t.dataset.restore, {}, ["deletedAt", "purgeAt"]); msg("Restored."); }
+      else {
+        const u = users.find(x => x.id === t.dataset.ext);
+        if (!u || u.extUsed) return;
+        await patch(u.id, { purgeAt: u.purgeAt + 7 * 864e5, extUsed: true }); msg("Added 7 days.");
+      }
+    } else if (t.dataset.a) {
+      const a = t.dataset.a, u = users.find(x => x.id === $("a-user").value.trim() && !x.deletedAt);
+      if (!u) return msg("No user with that name.");
+      const ownerOnly = a === "promote" || a === "demote";
+      if (u.role === "owner" || (u.role === "admin" && me.role !== "owner") || (ownerOnly && me.role !== "owner") || (u.id === me.name && a !== "unban"))
+        return msg("You can't do that to this account.");
+      if (a === "ban") { const h = Number($("a-hours").value); if (!(h > 0)) return msg("Enter ban hours."); await patch(u.id, { banUntil: Date.now() + h * 36e5 }); }
+      else if (a === "perm") await patch(u.id, { banUntil: -1 });
+      else if (a === "unban") await patch(u.id, { banUntil: 0 });
+      else await patch(u.id, { role: a === "promote" ? "admin" : "user" });
+      msg("Done.");
+    } else return;
+    loadAdmin();
+  } catch (x) { console.error(x); msg("That didn't work. Check your connection and rules."); }
+});
+
 /* ---------- code advice ---------- */
-const SKELETON = `&lt;!DOCTYPE html&gt;
-&lt;html lang="en"&gt;
-&lt;head&gt;
-  &lt;meta charset="UTF-8"&gt;
-  &lt;title&gt;My Page&lt;/title&gt;
-  &lt;style&gt;
+const SKELETON = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Page</title>
+  <style>
     body { background-color: #f5f5f5; }
     .btn { background-color: #00ff00; height: 50px; width: 80px; }
-  &lt;/style&gt;
-&lt;/head&gt;
-&lt;body&gt;
-  &lt;button class="btn" onclick="addPoop()"&gt;poopysa buttcheek&lt;/button&gt;
-  &lt;script&gt;
+  </style>
+</head>
+<body>
+  <button class="btn" onclick="addPoop()">poopysa buttcheek</button>
+  <script>
     let poop = 0;
     function addPoop() {
       poop += 7;
     }
-  &lt;/script&gt;
-&lt;/body&gt;
-&lt;/html&gt;`;
+  <\/script>
+</body>
+</html>`;
 $("skeleton").textContent = SKELETON;
 $("copy").onclick = async () => {
   try { await navigator.clipboard.writeText(SKELETON); $("copy").textContent = "Copied"; }
