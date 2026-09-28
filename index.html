@@ -78,7 +78,9 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
 .kidbox{display:inline-block;position:relative;width:150px;height:22px;background:var(--leaf);border-radius:6px;vertical-align:middle;cursor:help}
 .kidbox::after{content:attr(data-tip);position:absolute;left:110%;top:50%;transform:translateY(-50%);background:var(--ink);color:#fff;font-size:12px;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:5}
 .kidbox:hover::after,.kidbox:focus::after{opacity:1}
-@media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}}
+footer{position:fixed;left:180px;right:0;bottom:0;height:36px;display:flex;align-items:center;justify-content:center;background:var(--grape);color:#d9c9f2;font-size:13px;z-index:10}
+main{padding-bottom:60px}
+@media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}footer{left:120px}}
 </style>
 </head>
 <body>
@@ -219,6 +221,7 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
       <img src="assets/images/scp096_meme.png" alt="SCP-096 meme">
     </div>
   </section>
+  <footer>&copy; 2026 GrapeGreen Inc. All rights reserved</footer>
 </main>
 
 <script>
