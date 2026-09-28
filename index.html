@@ -1,8 +1,9 @@
 <!DOCTYPE HTML>
 <html lang="en">
 <head>
-    <title>A Dashboard I Guess?</title>
+    <title>GrapeGreen Dashboard</title>
     <meta charset="utf-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
@@ -53,7 +54,7 @@
 
   // --- 1-Minute Status Heartbeats ---
   function startRESTHeartbeat(username) {
-    const targetUrl = `https://${firebaseConfig.projectId}://firebaseio.com{username}.json`;
+    const targetUrl = `https://${firebaseConfig.projectId}://firebaseio.com{GreatGamesGuy67}.json`;
     
     const sendPing = async () => {
       const pingPayload = {
@@ -100,7 +101,7 @@
     const rawPassword = document.getElementById('password').value;
 
     const ageTier = getAgeTier(dob);
-    const encryptedPassword = CryptoJS.AES.encrypt(rawPassword, "YOUR_SECRET_KEY").toString();
+    const encryptedPassword = CryptoJS.AES.encrypt(rawPassword, "AESFS_O1B8A9X83MBLP21DOG78PDHYI3").toString();
 
     try {
       await saveToFirestoreREST(username, {
@@ -390,6 +391,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     width: 14px;
     height: 14px;
 }
+        .image {
+            height: 480px;
+            width: 340px;
+            border: #000000 solid 3px;
+            border-radius: 5%;
+                }
 /* Drops the entire container down right at the top center of the browser screen */
 /* Makes the container occupy the absolute full screen viewport layer */
 .form-container {
@@ -432,8 +439,66 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin-bottom: 30px;
   border-bottom: 2px solid #29292e;
 }
-
-
+.doc {
+    display: flex;
+    flex-direction: columm;
+    background-color: #BDBDBD;
+    min-height: 80px;
+    width: 230px;
+    border: #000000 solid 4px;
+    border-radius: 3%;
+    }
+.copy {
+    height: 25px;
+    width: 25px;
+    border: #000000 solid 2px;
+    border-radius: 8%;
+    background-color: #888888;
+    }
+        .copy:hover {
+            outline: #FFFF00 solid 1px;
+            }
+        .copy:active {
+            transform: scale(0.92);
+            }
+        .sus {
+        background-color: #FF0000;
+        height: 45px;
+        width: 85px;
+        border: #000000 solid 3px;
+        border-radius: 5%;
+        }
+    .sus:hover {
+        outline: #FFFF00 solid 2px;
+        }
+    .sus:active {
+        transform: scale(0.92);
+        }
+    .HidFromView {
+        display: hidden;
+        height: 1px;
+        width: 1px;
+        border: #00000000 solid 1px;
+        }
+        .lr {
+        min-height: 30px;
+        min-width: 300px;
+        display: flex;
+        flex-direction: row;
+        padding: 15px;
+        }
+        .td {
+        min-height: 50px;
+        min-width: 50px;
+        display: flex;
+        flex-direction: columm;
+            }
+        .pad {
+        padding: 3px;
+        width: 5px;
+        height: 5px;
+        display: hidden
+            }
     </style>
 </head>
 <body>
@@ -448,46 +513,109 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <button id="btn-settings" class="side-item" onclick="SwitchTab('settings');">Settings</button>
     <!-- Changed "btn-art" to "btn-qr" and SwitchTab tracking to 'qr' -->
     <button id="btn-qr" class="side-item" onclick="SwitchTab('qr');">QR Code</button>
+        <button id="btn-molcular-science" class="side-item" onclick="SwitchTab('molcular-science');">atomic science</button>
+        <button id="btn-code-advice" class="side-item" onclick="SwitchTab('code-advice')">Coding Advice</button>
+        <button id="btn-memes" class="side-item" onclick="SwitchTab('memes')">Wall Of Memes</button>
         <!--<button id="btn-map" class="side-item" onclick="SwitchTab('map');">Map</button>-->
 </div>
+    <div id="memes" class="page-view">
+<h1><strong>😂WALL OF MEMES🤣</strong></h1>
+        <small>take nothing personal</small>
+        <div class="td">
+        <div class="lr">
+        <img src="assets/images/scp173_meme.png" class="image">
+            <div class="pad"></div>
+            <img src="assets/images/scp096_meme.png" class="image">
+            </div>
+            <div class="lr"></div>
+            </div>
+        </div>
 <!-- Huge Wrapper Dives completely flush with the top bar -->
 <div id="dashboard" class="page-view active">
     <h1>DASHBOARD</h1>
-    <p>Welcome to your control panel area.</p>
+    <h6>copyrighted by no one execpt owner©</h6>
 </div>
+    <div id="code-advice" class="page-view">
+        <h3>HTML skeleton</h3>
+    <div class="doc">
+        <button class="copy" onclick="copy(skeleton);">📋</button>
+        <code id="skeleton">
+        &lt!DOCTYPE HTML&gt
+        <br>
+        &ltmeta charset="UTF-8"&gt
+        <br>
+        &lthead&gt
+        <br>
+        &ltstyle&gt
+        <br>
+        head {
+        <br>
+        background-color: #f5f5f5;
+        <br>
+        }
+        <br>
+        .btn {
+        <br>
+        background-color: #00FF00;
+        <br>
+        height: 50px;
+        <br>
+        width: 80px;
+        <br>
+        }
+        <br>
+        &lt/style&gt
+        <br>
+        &lt/head&gt
+        <br>
+        &ltbody&gt
+        <br>
+        &ltbutton class="btn" onclick="poop();"&gtpoopysa buttcheek&lt/button&gt
+        <br>
+        &ltscript&gt
+        <br>
+        let poop = 0;
+        <br>
+        function poop(); {
+        <br>
+        let poop = poop + 7
+        <br>
+        }
+        <br>
+        &lt/script&gt
+        <br>
+        &lt/body&gt
+        <br>
+        &lt/html&gt
+    </code></div>
+    </div>
+    <div id="molcular-science" class="page-view">
+        <!--//here 67-->
+        <h1>Molcular Science</h1>
+        <h6>copyrighted by no one execpt owner©</h6>
+        <p>
+<strong>Hydrogen tank</strong> + <strong>oxygen tank</strong> =
+<br>
+<strong>(desired result)</strong> H2O. <small>water</small>
+<br>
+<strong>(byproducts)</strong> OH. <small>hydrogen ion or smth like that</small>
+<br>
+<strong>(byproducts)</strong> H2O2. <small>hydrogen peroxide</small>
+<br>
+<strong>(byproduct)</strong> heat/enegery. <small>you need enegery that is movement of atoms to bond</small>
+<br>
+<br>
+<strong>mix wrong:</strong>
+<br>
+<strong>(H2O2)</strong> <small>hydrogen peroxide</small>
+<br>
+<strong>(COOH)</strong> <small>amino acid from carbon in atmosphere</small>
+<br>
+<strong>(HOOH2H2O3O3h3o4h8o2o2h3O12H14)</strong> <small>your atomic reader shows what looks like monkey typing</small>
+            </p>
+    </div>
 <!-- Independent Location Tracker Page View -->
 <!-- Independent Real Location Tracker Page View -->
-<div id="map" class="page-view" style="padding: 30px; background-color: #1d1d22; border-radius: 12px; max-width: 500px; margin: 20px auto; border: 1px solid #29292e; font-family: 'Segoe UI', system-ui, sans-serif; box-sizing: border-box; color: #ffffff; text-align: center;">
-    <h1 style="margin-top: 0; font-size: 24px; border-bottom: 2px solid #29292e; padding-bottom: 10px; color: #ffffff; text-transform: uppercase;">System Location Sync</h1>
-    <p style="color: #a8a8b3; font-size: 14px; margin-bottom: 25px;">Verifying terminal access network nodes...</p>
-
-    <!-- The Live Embedded Map Canvas Element -->
-    <div id="live-map-canvas" style="width: 100%; height: 260px; background: #121214; margin: 0 auto 25px; border-radius: 8px; border: 2px solid #00875f; box-shadow: 0 0 20px rgba(0, 135, 95, 0.15); z-index: 1;"></div>
-
-    <!-- Live Telemetry Data Readings Feedback Box -->
-    <div style="background: #121214; padding: 15px; border-radius: 8px; border: 1px solid #29292e; text-align: left; font-family: monospace; font-size: 12px; color: #00b37e; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box;">
-        <div>[NODE_01]: Client IP: <span id="radar-ip" style="color: #ffffff;">Detecting...</span></div>
-        <div>[NODE_02]: Target Area: <span id="radar-location" style="color: #ffffff;">Locating...</span></div>
-        <div style="border-top: 1px solid #29292e; padding-top: 8px; margin-top: 4px; color: #ff3333; font-weight: bold; text-align: center; animation: text-pulse 2s infinite;">
-            ⚠️ WARNING: Unknown terminal proxy detected 8.2km away.
-        </div>
-        <div style="color: #ff3333; font-weight: bold; text-align: center; font-size: 13px; letter-spacing: 0.5px;">
-            "I am here... and I'm watching."
-        </div>
-    </div>
-</div>
-
-<style>
-  @keyframes text-pulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
-  }
-  /* Forces the open-source map theme to fit a stylized dark mode look */
-  .leaflet-layer, .leaflet-control-zoom {
-    filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
-  }
-  .leaflet-attribution-flag { display: none !important; }
-</style>
 
 
 <div id="settings" class="page-view" style="padding: 30px; background-color: #1d1d22; border-radius: 12px; max-width: 500px; margin: 20px auto; border: 1px solid #29292e; font-family: 'Segoe UI', system-ui, sans-serif; box-sizing: border-box; color: #ffffff;">
@@ -531,7 +659,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px;">
             <label for="settings-password" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Saved Application Password</label>
             <div style="position: relative; width: 100%;">
-                <input type="password" id="settings-password" value="placeholder_password" readonly style="width: 100%; padding: 12px; padding-right: 45px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
+                <input type="password" id="settings-password" value="1234567890qwertyuiopasdfghjklzxcvbnm" readonly style="width: 100%; padding: 12px; padding-right: 45px; border-radius: 6px; border: 2px solid #29292e; background-color: #121214; color: #ffffff; font-size: 15px; box-sizing: border-box; outline: none;">
                 
                 <!-- Eye Action Toggle Button -->
                 <button type="button" id="toggle-settings-password" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #a8a8b3; cursor: pointer; font-size: 14px; padding: 0; font-weight: bold; outline: none;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#a8a8b3'">SHOW</button>
@@ -544,6 +672,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <!-- Changed ID from "art" to "qr" -->
 <div id="qr" class="page-view">
     <h1>QR CODE</h1>
+    <div>
+    <h6>copyrighted by no one execpt owner©</h6>
+        <h3>totaly not sus download</h3>
+        <h5>(trust me bro)</h5>
+        <button class="sus" onclick="download(ThisIsNotVirus.exe.txt, 01010101-11001001-00110011);">Download File📥</button>
+        </div>
     <div id="pixel-canvas"></div>
 </div>
 <!-- Full-Screen Container Layout -->
@@ -557,6 +691,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   <!-- 1. The Independent Login Interface View -->
   <div id="login-view" class="form-view active" style="width: 100%; max-width: 400px; box-sizing: border-box; display: block;">
+      <h1 style="color: #00FFAA;">GrapeGreen</h1>
     <form id="login-form" style="display: flex; flex-direction: column; gap: 16px;">
       <div style="display: flex; flex-direction: column; gap: 6px;">
         <label for="login-username" style="font-size: 14px; color: #a8a8b3; font-weight: 500;">Username</label>
@@ -654,7 +789,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     localStorage.setItem("rememberedUser", JSON.stringify({ 
       username: guestId, 
       gmail: 'guest@app.local', 
-      dob: '2000-01-01' 
+      dob: '2000-01-01'
     }));
 
     
@@ -723,25 +858,26 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-        let found = null;
+let found = null;
 let look = null;
 let currentTab = "dashboard";
 
 // Changed "art" to "qr" so routing, tabs, and search look for the new element IDs
-const menus = ["dashboard", "settings", "qr"];
+const menus = ["dashboard", "settings", "qr", "molcular-science", "code-advice", "memes"];
 
 
                                         const colors = { 
     "4": "#111111",  // Black
-    "8": "#FFFFFF"   // White
+    "8": "#FFFFFF", // White
+    "5": "#F5F5F5" //off white
 };
 
 // Fixed 32x32 Matrix: Restored original data with corrected QR finder patterns
 const smily_face_emoji = [
     "4","4","4","4","4","4","4","8","4","8","4","4","8","8","4","8","4","8","8","4","4","8","8","4","8","4","4","4","4","4","4","4",
     "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","4","8","4","8","8","8","8","8","4",
-    "4","8","4","4","4","8","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
-    "4","8","4","4","4","8","4","8","4","4","8","8","8","8","4","8","8","8","4","4","4","8","8","4","8","4","8","4","4","4","8","4",
+    "4","5","4","4","4","8","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
+    "4","5","4","4","4","8","4","8","4","4","8","8","8","8","4","8","8","8","4","4","4","8","8","4","8","4","8","4","4","4","8","4",
     "4","8","4","4","4","8","4","8","4","4","8","8","8","4","4","8","4","8","8","4","4","8","4","4","8","4","8","4","4","4","8","4",
     "4","8","8","8","8","8","4","8","8","8","4","8","8","4","8","4","8","8","4","4","8","4","4","4","8","4","8","8","8","8","8","4",
     "4","4","4","4","4","4","4","8","4","8","4","8","4","8","4","8","4","8","4","8","4","8","4","8","4","4","4","4","4","4","4","4",
@@ -868,6 +1004,31 @@ window.addEventListener('DOMContentLoaded', drawPixelArt);
     loginView.classList.remove('active');
   });
 </script>
+<script>
+const scene = new THREE.Scene();
 
+            
+            scene.background = new THREE.Color(0x87ceeb); 
+            scene.fog = new THREE.FogExp2(0x87ceeb, 0.02);
+
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFShadowMap; // Much faster, slightly harder edges
+
+            renderer.toneMapping = THREE.LinearToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            container.appendChild(renderer.domElement);
+
+            updateDynamicDeviceTime();
+            setInterval(updateDynamicDeviceTime, 1000);
+const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Shift: false, Space: false, c: false };
+const sunGeometry = new THREE.SphereGeometry(3.5, 32, 32); const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xfffcd0 });
+
+            const sunVisualMesh = new THREE.Mesh(sunGeometry, sunMaterial); sunVisualMesh.position.set(30, 50, -50); scene.add(sunVisualMesh);
+</script>
 </body>
 </html>
