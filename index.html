@@ -582,25 +582,48 @@ $("admin").addEventListener("click", async e => {
 });
 
 /* ---------- code advice ---------- */
-const SKELETON = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>My Page</title>
-  <style>
-    body { background-color: #f5f5f5; }
-    .btn { background-color: #00ff00; height: 50px; width: 80px; }
-  </style>
-</head>
-<body>
-  <button class="btn" onclick="addPoop()">poopysa buttcheek</button>
-  <script>
-    let poop = 0;
-    function addPoop() {
-      poop += 7;
-    }
-  <\/script>
-</body>
+const SKELETON = `<!DOCTYPE html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8"> 
+    <title>My Page</title> 
+    <style> 
+        body { 
+            background-color: #f5f5f5; 
+            font-family: sans-serif;
+            padding: 20px;
+        } 
+        .btn { 
+            background-color: #00ff00; 
+            height: 50px; 
+            width: 150px; /* Widened slightly so text fits cleanly */
+            cursor: pointer;
+            font-weight: bold;
+        } 
+        .counter {
+            font-size: 24px;
+            margin-top: 150px;
+            font-weight: bold;
+        }
+    </style> 
+</head> 
+<body> 
+
+    <button class="btn" onclick="addPoop()">poopysa buttcheek</button> 
+    
+    <!-- Added a paragraph tag to display the actual score -->
+    <p class="counter">Total: <span id="score">0</span></p>
+
+    <script> 
+        let poop = 0; 
+        
+        function addPoop() { 
+            poop += 7; 
+            // This line finds the 'score' element and changes its text to the new total
+            document.getElementById("score").innerText = poop;
+        } 
+    <\/script> 
+</body> 
 </html>`;
 $("skeleton").textContent = SKELETON;
 $("copy").onclick = async () => {
