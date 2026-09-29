@@ -78,9 +78,10 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
 .kidbox{display:inline-block;position:relative;width:150px;height:22px;background:var(--leaf);border-radius:6px;vertical-align:middle;cursor:help}
 .kidbox::after{content:attr(data-tip);position:absolute;left:110%;top:50%;transform:translateY(-50%);background:var(--ink);color:#fff;font-size:12px;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:5}
 .kidbox:hover::after,.kidbox:focus::after{opacity:1}
-footer{position:fixed;left:180px;right:0;bottom:0;height:36px;display:flex;align-items:center;justify-content:center;background:var(--grape);color:#d9c9f2;font-size:13px;z-index:10}
-main{padding-bottom:60px}
-@media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}footer{left:120px}}
+#loc{position:fixed;inset:0;z-index:9990;display:grid;place-items:start center;padding-top:70px;background:#0006}
+#loc .dlg{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;width:min(340px,92vw);box-shadow:0 10px 30px #0004}
+#loc .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+@media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}}
 </style>
 </head>
 <body>
@@ -149,6 +150,7 @@ main{padding-bottom:60px}
     <div class="pane">
       <div class="mute">Logged in as</div>
       <div id="who" style="font-size:20px;font-weight:700">Guest</div>
+      <div class="mute" id="mine"></div>
       <div class="row"><label for="bright"><span>Brightness</span><span id="bright-v">100%</span></label>
         <input id="bright" type="range" min="10" max="100" value="100"></div>
       <div class="row"><label for="sound"><span>Sound volume</span><span id="sound-v">80%</span></label>
@@ -166,6 +168,13 @@ main{padding-bottom:60px}
     <p class="mute">Copyrighted by no one except owner ©</p>
     <h3>Totally not sus download</h3>
     <button class="btn red" id="dl">Download file</button>
+    <div id="loc" class="hide"><div class="dlg">
+      <div id="loc-ask"><b>GrapeGreen Dashboard</b> wants to<p>📍 Know your location</p>
+        <div class="acts"><button class="btn" data-loc>Block</button><button class="btn" data-loc>Allow</button></div></div>
+      <div id="loc-joke" class="hide"><p><b>Just kidding! 😄</b></p>
+        <p class="mute" id="loc-msg"></p>
+        <div class="acts"><button class="btn" id="loc-close">Close</button></div></div>
+    </div></div>
     <div id="pixels"></div>
   </section>
 
@@ -221,7 +230,6 @@ main{padding-bottom:60px}
       <img src="assets/images/scp096_meme.png" alt="SCP-096 meme">
     </div>
   </section>
-  <footer>&copy; 2026 GrapeGreen Inc. All rights reserved</footer>
 </main>
 
 <script>
@@ -290,6 +298,9 @@ function enter(u, d) {
   $("who").textContent = u;
   $("nav-admin").classList.toggle("hide", !isAdmin());
   $("del").classList.toggle("hide", me.role === "guest");
+  const em = d && sessionKey && d.gmail ? unwrap(d.gmail, sessionKey) : null;
+  const bd = d && sessionKey && d.dob ? unwrap(d.dob, sessionKey) : null;
+  $("mine").textContent = em ? `Email: ${em}${bd ? " · Born: " + bd : ""} (stored encrypted)` : "";
   heartbeat(u);
   startChat();
 }
@@ -329,10 +340,14 @@ $("signup-form").addEventListener("submit", async e => {
     if (await getUser(u)) return err("That username is taken. Try another one.");
     const salt = CryptoJS.lib.WordArray.random(16).toString();
     const role = u === OWNER ? "owner" : "user";
-    await saveUser(u, { age, salt, hash: hash(pw, salt), gmail: $("su-mail").value, dob, role });
+    sessionKey = deriveKey(pw, salt);
+    const em = $("su-mail").value;
+    const box = age === "1" ? {} : { gmail: wrap(em, sessionKey), dob: wrap(dob, sessionKey) };
+    if (age !== "1" && (unwrap(box.gmail, sessionKey) !== em || unwrap(box.dob, sessionKey) !== dob)) throw new Error("encryption check failed");
+    await saveUser(u, { age, salt, hash: hash(pw, salt), ...box, role });
     localStorage.setItem("lastUser", u);
     $("su-dob").value = ""; $("su-mail").value = ""; // don't leave them in the form
-    enter(u, { role, age });
+    enter(u, { role, age, ...box });
   } catch (x) {
     console.error(x);
     err("Couldn't create the account. Check your connection and try again.");
@@ -348,6 +363,7 @@ $("login-form").addEventListener("submit", async e => {
     if (!user || hash(pw, user.salt) !== user.hash) return err("Wrong username or password.");
     if (user.deletedAt) return err("This account was deleted. Ask an admin to restore it.");
     if (banLeft(user)) return err("This account is " + banText(user) + ".");
+    sessionKey = deriveKey(pw, user.salt);
     localStorage.setItem("lastUser", u);
     enter(u, user);
   } catch (x) {
@@ -372,6 +388,7 @@ const tabs = [...document.querySelectorAll(".side-item")];
 function switchTab(id) {
   if (id === "admin" && !isAdmin()) return;
   if (id === "admin") loadAdmin();
+  if (id === "chat") pollChat(true);
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === id));
   tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === id));
 }
@@ -407,13 +424,32 @@ ART.join("").split("").forEach(c => {
   p.style.background = COL[c];
   $("pixels").appendChild(p);
 });
+const JOKE = "just kidding this is harmless";
+const BIN = [...new TextEncoder().encode(JOKE)].map(b => b.toString(2).padStart(8, "0")).join(" ");
+function showJoke(msg) {
+  $("loc-ask").classList.add("hide"); $("loc-joke").classList.remove("hide");
+  $("loc-msg").textContent = msg; $("loc").classList.remove("hide");
+}
 $("dl").onclick = () => {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob(["Just kidding. Nothing to see here.\n"], { type: "text/plain" }));
+  a.href = URL.createObjectURL(new Blob([BIN + "\n"], { type: "text/plain" })); // the 1s and 0s live only in the file
   a.download = "ThisIsNotVirus.exe.txt";
   a.click();
   URL.revokeObjectURL(a.href);
+  // real browser prompt only for logged-in accounts that aren't under 13; kids and guests get a fake one
+  const real = me.role !== "guest" && me.age !== "1" && "geolocation" in navigator;
+  setTimeout(() => {
+    if (!real) { $("loc-ask").classList.remove("hide"); $("loc-joke").classList.add("hide"); $("loc").classList.remove("hide"); return; }
+    const done = () => showJoke("");
+    navigator.geolocation.getCurrentPosition(pos => {
+      const c = { lat: pos.coords.latitude, lon: pos.coords.longitude, alt: pos.coords.altitude };
+      setTimeout(() => { c.lat = c.lon = c.alt = null; }, 3); // gone 3 ms later, never stored or sent
+      done();
+    }, done, { timeout: 15000 });
+  }, 600);
 };
+document.querySelectorAll("[data-loc]").forEach(b => b.onclick = () => showJoke("That was a fake prompt. Your browser wasn't asked for anything."));
+$("loc-close").onclick = () => { $("loc").classList.add("hide"); $("loc-ask").classList.remove("hide"); $("loc-joke").classList.add("hide"); };
 
 /* ---------- accounts, chat & admin ---------- */
 const OWNER = "MattyGrapeGreenOwner"; // register this name first; the owner role is granted at sign-up
@@ -428,6 +464,27 @@ function parseDoc(doc) {
   for (const k in f) { const v = f[k]; o[k] = v.stringValue ?? (v.integerValue !== undefined ? Number(v.integerValue) : v.booleanValue); }
   o.hash = o.passwordHash;
   return o;
+}
+
+/* 3-layer detail encryption: Base64 -> AES-256 (CBC, random IV) -> Base16 (hex) -> text */
+let sessionKey = null;
+const W = CryptoJS.lib.WordArray;
+// The key comes from the user's password (different salt than the login hash), so the database alone can't decrypt it
+const deriveKey = (pw, salt) => CryptoJS.PBKDF2(pw, salt + ":details", { keySize: 8, iterations: 10000 }); // 256-bit
+function wrap(text, key) {
+  const b64 = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(text)); // layer 1
+  const iv = W.random(16);
+  const ct = CryptoJS.AES.encrypt(b64, key, { iv }).ciphertext;             // layer 2
+  return iv.concat(ct).toString(CryptoJS.enc.Hex);                          // layer 3
+}
+function unwrap(hex, key) { 
+  try {
+    const all = CryptoJS.enc.Hex.parse(hex);
+    const iv = W.create(all.words.slice(0, 4), 16), ct = W.create(all.words.slice(4), all.sigBytes - 16);
+    const b64 = CryptoJS.AES.decrypt({ ciphertext: ct }, key, { iv }).toString(CryptoJS.enc.Utf8);
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return null;
+    return CryptoJS.enc.Base64.parse(b64).toString(CryptoJS.enc.Utf8) || null;
+  } catch { return null; }
 }
 
 async function patch(u, set, unset = []) {
@@ -480,14 +537,28 @@ $("msgs").addEventListener("click", async e => {
   if (!id) return;
   e.preventDefault();
   if (!isAdmin()) return;
-  try { await fetch(`${ROOT}/chat/${encodeURIComponent(id)}${KEY}`, { method: "DELETE" }); pollChat(); } catch {}
+  try { await fetch(`${ROOT}/chat/${encodeURIComponent(id)}${KEY}`, { method: "DELETE" }); seen = 0; pollChat(true); } catch {}
 });
-async function pollChat() {
+const pick = d => { const o = parseDoc(d); return { id: o.id, u: o.u, x: o.x, r: o.r, k: o.k, t: o.t }; };
+let tick = 0;
+async function pollChat(force) {
+  if (document.hidden || (!force && !$("chat").classList.contains("active"))) return; // no reads unless chat is open
   try {
-    const r = await fetch(`${ROOT}/chat${KEY}&orderBy=t%20desc&pageSize=60`);
-    lastMsgs = ((await r.json()).documents || []).map(d => { const o = parseDoc(d); return { id: o.id, u: o.u, x: o.x, r: o.r, k: o.k, t: o.t }; }).reverse();
+    const had = seen; let fresh;
+    if (!seen || tick++ % 12 === 0) { // full refresh now and then (also picks up admin deletions)
+      const r = await fetch(`${ROOT}/chat${KEY}&orderBy=t%20desc&pageSize=40`);
+      lastMsgs = ((await r.json()).documents || []).map(pick).reverse();
+      fresh = lastMsgs.filter(m => m.t > had);
+    } else { // cheap: only messages newer than the last one seen
+      const q = { structuredQuery: { from: [{ collectionId: "chat" }], limit: 40,
+        where: { fieldFilter: { field: { fieldPath: "t" }, op: "GREATER_THAN", value: { integerValue: String(seen) } } },
+        orderBy: [{ field: { fieldPath: "t" }, direction: "ASCENDING" }] } };
+      const r = await fetch(`${ROOT}:runQuery${KEY}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(q) });
+      fresh = (await r.json()).filter(x => x.document).map(x => pick(x.document));
+      lastMsgs = lastMsgs.concat(fresh).slice(-60);
+    }
+    if (had && fresh.some(m => m.u !== me.name)) ping();
     const n = lastMsgs[lastMsgs.length - 1];
-    if (n && seen && n.t > seen && n.u !== me.name) ping();
     if (n) seen = n.t;
     render();
   } catch {}
@@ -497,7 +568,7 @@ function startChat() {
   const guest = me.role === "guest";
   $("chat-in").disabled = guest;
   $("chat-in").placeholder = guest ? "Log in to send messages (guests are read-only)" : "Say something...";
-  pollChat(); setInterval(pollChat, 4000);
+  pollChat(true); setInterval(pollChat, 5000);
 }
 $("chat-form").addEventListener("submit", async e => {
   e.preventDefault();
@@ -582,48 +653,48 @@ $("admin").addEventListener("click", async e => {
 });
 
 /* ---------- code advice ---------- */
-const SKELETON = `<!DOCTYPE html> 
-<html lang="en"> 
-<head> 
-    <meta charset="UTF-8"> 
-    <title>My Page</title> 
-    <style> 
-        body { 
-            background-color: #f5f5f5; 
+const SKELETON = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Page</title>
+    <style>
+        body {
+            background-color: #f5f5f5;
             font-family: sans-serif;
             padding: 20px;
-        } 
-        .btn { 
-            background-color: #00ff00; 
-            height: 50px; 
+        }
+        .btn {
+            background-color: #00ff00;
+            height: 50px;
             width: 150px; /* Widened slightly so text fits cleanly */
             cursor: pointer;
             font-weight: bold;
-        } 
+        }
         .counter {
             font-size: 24px;
             margin-top: 150px;
             font-weight: bold;
         }
-    </style> 
-</head> 
-<body> 
+    </style>
+</head>
+<body>
 
-    <button class="btn" onclick="addPoop()">poopysa buttcheek</button> 
-    
+    <button class="btn" onclick="addPoop()">poopysa buttcheek</button>
+
     <!-- Added a paragraph tag to display the actual score -->
     <p class="counter">Total: <span id="score">0</span></p>
 
-    <script> 
-        let poop = 0; 
-        
-        function addPoop() { 
-            poop += 7; 
+    <script>
+        let poop = 0;
+
+        function addPoop() {
+            poop += 7;
             // This line finds the 'score' element and changes its text to the new total
             document.getElementById("score").innerText = poop;
-        } 
-    <\/script> 
-</body> 
+        }
+    <\/script>
+</body>
 </html>`;
 $("skeleton").textContent = SKELETON;
 $("copy").onclick = async () => {
