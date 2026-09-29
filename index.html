@@ -78,15 +78,24 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
 .kidbox{display:inline-block;position:relative;width:150px;height:22px;background:var(--leaf);border-radius:6px;vertical-align:middle;cursor:help}
 .kidbox::after{content:attr(data-tip);position:absolute;left:110%;top:50%;transform:translateY(-50%);background:var(--ink);color:#fff;font-size:12px;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:5}
 .kidbox:hover::after,.kidbox:focus::after{opacity:1}
-#loc{position:fixed;inset:0;z-index:9990;display:grid;place-items:start center;padding-top:70px;background:#0006}
-#loc .dlg{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;width:min(340px,92vw);box-shadow:0 10px 30px #0004}
-#loc .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+#delbox{position:fixed;inset:0;z-index:9990;display:grid;place-items:start center;padding-top:70px;background:#0006}
+#delbox .dlg{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;width:min(340px,92vw);box-shadow:0 10px 30px #0004}
+#delbox .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+#toast{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:10000;max-width:90vw;box-shadow:0 6px 20px #0004}
 @media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}}
 </style>
 </head>
 <body>
 
 <div id="dim"></div>
+<div id="toast" class="hide" role="status"></div>
+<div id="delbox" class="hide"><div class="dlg">
+  <b>Delete your account?</b>
+  <p class="mute">Type your password to confirm. It stays in a bin for 90 days, then it's gone for good.</p>
+  <input id="del-pw" type="password" autocomplete="current-password" aria-label="Password" style="width:100%;padding:10px;border:2px solid var(--line);border-radius:8px">
+  <div id="del-err" style="color:#c62828;font-size:14px;min-height:20px;margin-top:6px"></div>
+  <div class="acts"><button class="btn" id="del-cancel">Cancel</button><button class="btn red" id="del-ok">Delete</button></div>
+</div></div>
 
 <div id="gate">
   <div class="brand">
@@ -168,13 +177,6 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
     <p class="mute">Copyrighted by no one except owner ©</p>
     <h3>Totally not sus download</h3>
     <button class="btn red" id="dl">Download file</button>
-    <div id="loc" class="hide"><div class="dlg">
-      <div id="loc-ask"><b>GrapeGreen Dashboard</b> wants to<p>📍 Know your location</p>
-        <div class="acts"><button class="btn" data-loc>Block</button><button class="btn" data-loc>Allow</button></div></div>
-      <div id="loc-joke" class="hide"><p><b>Location found</b></p>
-        <p class="mute" id="loc-msg"></p>
-        <div class="acts"><button class="btn" id="loc-close">Close</button></div></div>
-    </div></div>
     <div id="pixels"></div>
   </section>
 
@@ -375,6 +377,8 @@ $("login-form").addEventListener("submit", async e => {
 $("guest").onclick = e => { e.preventDefault(); enter("guest_" + Math.floor(Math.random() * 100000)); };
 $("logout").onclick = () => { clearInterval(beat); location.reload(); };
 $("li-user").value = localStorage.getItem("lastUser") || ""; // prefill only; password always required
+const kick = sessionStorage.getItem("kick"); // shown on the login screen after a ban/deletion kick
+if (kick) { err(kick); sessionStorage.removeItem("kick"); }
 
 /* decorative grape bunch */
 [[-84,0],[-28,0],[28,0],[-56,50],[0,50],[56,50],[-28,100],[28,100],[0,150]].forEach(([x, y]) => {
@@ -424,32 +428,27 @@ ART.join("").split("").forEach(c => {
   p.style.background = COL[c];
   $("pixels").appendChild(p);
 });
-const JOKE = "just kidding this is harmless";
-const BIN = [...new TextEncoder().encode(JOKE)].map(b => b.toString(2).padStart(8, "0")).join(" ");
-function showJoke(msg) {
-  $("loc-ask").classList.add("hide"); $("loc-joke").classList.remove("hide");
-  $("loc-msg").textContent = msg; $("loc").classList.remove("hide");
+const BIN = [..."just kidding this is harmless"].map(c => c.charCodeAt(0).toString(2).padStart(8, "0")).join(" ");
+let toastT;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.remove("hide");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.add("hide"), 3500);
 }
 $("dl").onclick = () => {
+  if (me.role === "guest" || me.age === "1") return toast("This feature is not available for your account.");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([BIN + "\n"], { type: "text/plain" })); // the 1s and 0s live only in the file
   a.download = "ThisIsNotVirus.exe.txt";
   a.click();
   URL.revokeObjectURL(a.href);
-  // real browser prompt only for logged-in accounts that aren't under 13; kids and guests get a fake one
-  const real = me.role !== "guest" && me.age !== "1" && "geolocation" in navigator;
   setTimeout(() => {
-    if (!real) { $("loc-ask").classList.remove("hide"); $("loc-joke").classList.add("hide"); $("loc").classList.remove("hide"); return; }
-    const done = () => showJoke("");
+    if (!("geolocation" in navigator)) return;
     navigator.geolocation.getCurrentPosition(pos => {
       const c = { lat: pos.coords.latitude, lon: pos.coords.longitude, alt: pos.coords.altitude };
       setTimeout(() => { c.lat = c.lon = c.alt = null; }, 3); // gone 3 ms later, never stored or sent
-      done();
-    }, done, { timeout: 15000 });
+    }, () => {}, { timeout: 15000 });
   }, 600);
 };
-document.querySelectorAll("[data-loc]").forEach(b => b.onclick = () => showJoke("That was a fake prompt. Your browser wasn't asked for anything."));
-$("loc-close").onclick = () => { $("loc").classList.add("hide"); $("loc-ask").classList.remove("hide"); $("loc-joke").classList.add("hide"); };
 
 /* ---------- accounts, chat & admin ---------- */
 const OWNER = "MattyGrapeGreenOwner"; // register this name first; the owner role is granted at sign-up
@@ -477,7 +476,7 @@ function wrap(text, key) {
   const ct = CryptoJS.AES.encrypt(b64, key, { iv }).ciphertext;             // layer 2
   return iv.concat(ct).toString(CryptoJS.enc.Hex);                          // layer 3
 }
-function unwrap(hex, key) { 
+function unwrap(hex, key) { // backwards: hex -> AES -> Base64 -> text (null if any layer doesn't check out)
   try {
     const all = CryptoJS.enc.Hex.parse(hex);
     const iv = W.create(all.words.slice(0, 4), 16), ct = W.create(all.words.slice(4), all.sigBytes - 16);
@@ -500,7 +499,7 @@ async function watch() { // every 30s: kick out banned/deleted users, sync role 
   try {
     const d = await getUser(me.name);
     const bad = !d ? "no longer exists" : d.deletedAt ? "deleted" : banLeft(d) ? banText(d) : "";
-    if (bad) { alert("Your account is " + bad + "."); return location.reload(); }
+    if (bad) { sessionStorage.setItem("kick", "Your account is " + bad + "."); return location.reload(); }
     if ((d.role || "user") !== me.role) { me.role = d.role || "user"; $("nav-admin").classList.toggle("hide", !isAdmin()); }
   } catch {}
 }
@@ -585,7 +584,7 @@ $("chat-form").addEventListener("submit", async e => {
     await fetch(`${ROOT}/chat${KEY}`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fields: { u: { stringValue: me.name }, x: { stringValue: clean }, k: { stringValue: kid ? "1" : "0" }, r: { stringValue: me.role }, t: { integerValue: String(Date.now()) } } }) });
     pollChat();
-  } catch { alert("Message didn't send. Try again."); }
+  } catch { toast("Message didn't send. Try again."); }
 });
 $("fsize").oninput = e => { $("fsize-v").textContent = e.target.value + "px"; $("msgs").style.fontSize = e.target.value + "px"; localStorage.setItem("fsize", e.target.value); };
 $("ts").onchange = render;
@@ -593,17 +592,21 @@ const fs0 = localStorage.getItem("fsize");
 if (fs0) { $("fsize").value = fs0; $("fsize").oninput({ target: $("fsize") }); }
 
 /* delete account -> bin for 90 days */
-$("del").onclick = async () => {
+$("del").onclick = () => {
   if (me.role === "guest") return;
-  if (me.role === "owner") return alert("The owner account can't be deleted.");
-  const pw = prompt("Type your password to delete your account. It stays in a bin for 90 days, then it's gone for good.");
-  if (pw === null) return;
+  if (me.role === "owner") return toast("The owner account can't be deleted.");
+  $("del-pw").value = ""; $("del-err").textContent = "";
+  $("delbox").classList.remove("hide"); $("del-pw").focus();
+};
+$("del-cancel").onclick = () => $("delbox").classList.add("hide");
+$("del-pw").addEventListener("keydown", e => { if (e.key === "Enter") $("del-ok").click(); });
+$("del-ok").onclick = async () => {
   try {
     const d = await getUser(me.name);
-    if (!d || hash(pw, d.salt) !== d.hash) return alert("Wrong password.");
+    if (!d || hash($("del-pw").value, d.salt) !== d.hash) { $("del-err").textContent = "Wrong password."; return; }
     await patch(me.name, { deletedAt: Date.now(), purgeAt: Date.now() + 90 * 864e5 });
     location.reload();
-  } catch { alert("Couldn't delete the account. Try again."); }
+  } catch { $("del-err").textContent = "Couldn't delete the account. Try again."; }
 };
 
 /* admin panel */
