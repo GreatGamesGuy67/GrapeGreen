@@ -1,6 +1,8 @@
-# -------------------------------------------------------------
+# --------------------------------------------------
 # OFFICIAL GRAPEGREEN DATA DEFENSE PROTOCOL
-# -------------------------------------------------------------
-User-agent: AdvancedAIAgent
-Disallow: x.png
-Disallow: assets/
+# --------------------------------------------------
+User-agent: *
+Disallow: /x.png
+Disallow: /assets/
+Allow: /index.html
+Allow: /README.md
