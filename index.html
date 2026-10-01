@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GrapeGreen Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import { getFirestore, collection, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+const db = getFirestore(initializeApp({ projectId: "app-iguess-39f2f", apiKey: "AIzaSyAqy6NWFJ1KD9Cfv_WyqbMJJWCqlC5P7Es" }));
+window.listenChat = (ok, bad) => onSnapshot(query(collection(db, "chat"), orderBy("t", "desc"), limit(60)), snap => ok(snap.docs.map(d => ({ id: d.id, ...d.data() }))), bad);
+</script>
 <style>
 :root{--grape:#3b1a63;--grape2:#7a4bb8;--leaf:#a3d95c;--paper:#f6f2fb;--ink:#1b1030;--mute:#6b5f85;--line:#ddd3ee}
 *{box-sizing:border-box}
@@ -82,6 +88,22 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
 #delbox .dlg{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;width:min(340px,92vw);box-shadow:0 10px 30px #0004}
 #delbox .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 #toast{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:10000;max-width:90vw;box-shadow:0 6px 20px #0004}
+.set{display:grid;gap:16px;max-width:560px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}
+.card h3{margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.card.danger{border-color:#f0b4b4}
+.prof{display:flex;align-items:center;gap:14px}
+#av{flex:none;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--grape2),var(--leaf));color:#fff;display:grid;place-items:center;font-size:24px;font-weight:800}
+.badge{display:inline-block;background:var(--leaf);color:var(--ink);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;margin-left:8px;vertical-align:middle}
+.sws{display:flex;gap:10px;flex-wrap:wrap}
+.sw{width:34px;height:34px;padding:0;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px var(--line)}
+.sw.on{box-shadow:0 0 0 3px var(--ink)}
+input[type=checkbox]{accent-color:var(--grape2);width:18px;height:18px}
+.side{overflow-y:auto}
+.fld{display:block;width:100%;padding:10px;border:2px solid var(--line);border-radius:10px;margin:8px 0;font:inherit}
+.av-b{width:40px;height:40px;font-size:22px;padding:0;border:2px solid var(--line);border-radius:10px;background:#fff}
+.av-b.on{border-color:var(--grape2);background:var(--paper)}
+td img{display:block;margin-top:6px;border:1px solid var(--line);border-radius:6px}
 @media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}}
 </style>
 </head>
@@ -145,6 +167,8 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
   <button class="side-item" data-tab="code">Coding advice</button>
   <button class="side-item" data-tab="memes">Wall of memes</button>
   <button class="side-item" data-tab="chat">Chat</button>
+  <button class="side-item" data-tab="updates">Update log</button>
+  <button class="side-item" data-tab="help">Help</button>
   <button class="side-item hide" id="nav-admin" data-tab="admin">Admin panel</button>
 </nav>
 
@@ -156,19 +180,29 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
 
   <section id="settings" class="view">
     <h1>Settings</h1>
-    <div class="pane">
-      <div class="mute">Logged in as</div>
-      <div id="who" style="font-size:20px;font-weight:700">Guest</div>
-      <div class="mute" id="mine"></div>
-      <div class="row"><label for="bright"><span>Brightness</span><span id="bright-v">100%</span></label>
-        <input id="bright" type="range" min="10" max="100" value="100"></div>
-      <div class="row"><label for="sound"><span>Sound volume</span><span id="sound-v">80%</span></label>
-        <input id="sound" type="range" min="0" max="100" value="80"></div>
-      <div class="row"><label for="fsize"><span>Chat text size</span><span id="fsize-v">15px</span></label>
-        <input id="fsize" type="range" min="12" max="22" value="15"></div>
-      <label class="row" style="flex-direction:row;align-items:center;gap:8px"><input id="ts" type="checkbox" checked> Show chat timestamps</label>
-      <button class="btn red" id="logout">Log out</button>
-      <button class="btn red" id="del" style="margin-left:8px">Delete account</button>
+    <div class="set">
+      <div class="card"><h3>👤 Profile</h3>
+        <div class="prof"><div id="av">G</div>
+          <div><div><span id="who" style="font-size:20px;font-weight:700">Guest</span><span class="badge" id="rolebadge">Guest</span></div>
+            <div class="mute" id="mine"></div></div></div>
+        <div class="row"><label>Avatar</label><div class="sws" id="avs"></div></div>
+      </div>
+      <div class="card"><h3>🎨 Appearance</h3>
+        <div class="row"><label>Theme</label><div class="sws" id="sws"></div></div>
+        <div class="row"><label for="bright"><span>Brightness</span><span id="bright-v">100%</span></label>
+          <input id="bright" type="range" min="10" max="100" value="100"></div>
+      </div>
+      <div class="card"><h3>💬 Chat</h3>
+        <div class="row"><label for="fsize"><span>Text size</span><span id="fsize-v">15px</span></label>
+          <input id="fsize" type="range" min="12" max="22" value="15"></div>
+        <div class="row"><label for="sound"><span>Message ping volume</span><span id="sound-v">80%</span></label>
+          <input id="sound" type="range" min="0" max="100" value="80"></div>
+        <label class="row" style="flex-direction:row;align-items:center;gap:8px"><input id="ts" type="checkbox" checked> Show timestamps</label>
+      </div>
+      <div class="card danger"><h3>⚠️ Account</h3>
+        <button class="btn" id="logout">Log out</button>
+        <button class="btn red" id="del" style="margin-left:8px">Delete account</button>
+      </div>
     </div>
   </section>
 
@@ -216,12 +250,38 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
       <button class="btn" data-a="ban">Ban (hours)</button>
       <button class="btn red" data-a="perm">Perm ban</button>
       <button class="btn" data-a="unban">Unban</button>
-      <button class="btn" data-a="promote">Promote to admin</button>
-      <button class="btn" data-a="demote">Demote</button>
+      <button class="btn" data-a="role:admin">Make admin</button>
+      <button class="btn" data-a="role:dev">Make dev</button>
+      <button class="btn" data-a="role:user">Make user</button>
+      <button class="btn red" data-a="delete">Delete account</button>
     </div>
     <div id="a-msg" class="mute"></div>
     <h3>Users</h3><div id="a-users"></div>
+    <h3>Reports &amp; contact log</h3><div id="a-reports"></div>
     <div id="a-binbox"><h3>Bin (kept 90 days)</h3><div id="a-bin"></div></div>
+  </section>
+
+  <section id="updates" class="view">
+    <h1>Update log</h1>
+    <div id="upl"></div>
+    <div id="upform" class="card hide" style="max-width:560px"><h3>Add or edit an entry (devs)</h3>
+      <input class="fld" id="up-v" placeholder="Version, like v1.3" maxlength="12">
+      <input class="fld" id="up-t" placeholder="Title, like Security+" maxlength="60">
+      <textarea class="fld" id="up-n" rows="4" maxlength="800" placeholder="One change per line"></textarea>
+      <button class="btn" id="up-save">Save</button> <span class="mute" id="up-msg"></span></div>
+  </section>
+
+  <section id="help" class="view">
+    <h1>Help</h1>
+    <div class="card" style="max-width:560px;margin-bottom:16px"><h3>Limit of liability (lol)</h3>
+      <p class="mute">GrapeGreen is provided "as is" by a person with a keyboard. We are not liable for lost memes, emotional damage from the Wall of Memes, chat messages you regret, or the heat death of the universe. Use at your own risk. This is a joke, not a real legal document.</p></div>
+    <form id="ct-form" class="card" style="max-width:560px"><h3>Contact us</h3>
+      <input class="fld hide" id="ct-mail" type="email" placeholder="Your Gmail so we can reply">
+      <label id="ct-age" class="hide"><input type="checkbox" id="ct-13"> I'm 13 or older</label>
+      <input class="fld" id="ct-title" placeholder="Title" maxlength="80" required>
+      <textarea class="fld" id="ct-det" rows="4" maxlength="1000" placeholder="Details" required></textarea>
+      <div id="ct-shotrow"><input id="ct-shot" type="file" accept="image/*"> <span class="mute">Screenshots are shrunk to 144p</span></div>
+      <button class="btn" style="margin-top:10px">Send</button> <span class="mute" id="ct-msg"></span></form>
   </section>
 
   <section id="memes" class="view">
@@ -230,7 +290,7 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;font-size:14p
     <div class="memes">
       <img src="assets/images/scp173_meme.png" alt="SCP-173 meme">
       <img src="assets/images/scp096_meme.png" alt="SCP-096 meme">
-      <img src="assets/images/stress_meme.png" alt="stress meme">
+      <img src="assets/images/stress_meme.png" alt="Stress meme">
     </div>
   </section>
 </main>
@@ -272,14 +332,19 @@ async function saveUser(u, p) {
 }
 
 let beat = null;
+const presenceUrl = u => `https://${CFG.projectId}-default-rtdb.firebaseio.com/presence/${encodeURIComponent(u)}.json`;
 function heartbeat(u) {
   clearInterval(beat);
-  const url = `https://${CFG.projectId}-default-rtdb.firebaseio.com/presence/${encodeURIComponent(u)}.json`;
+  const url = presenceUrl(u);
   const ping = () => fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status: "online", lastPing: Date.now() }) }).catch(() => {});
   ping();
   beat = setInterval(ping, 60000);
 }
+// guest sessions are removed from Firebase on log out, tab close, or after 1 hour
+const endGuest = () => { if (me.role === "guest") fetch(presenceUrl(me.name), { method: "DELETE", keepalive: true }).catch(() => {}); };
+addEventListener("pagehide", endGuest);
+function signOut(msg) { endGuest(); clearInterval(beat); if (msg) sessionStorage.setItem("kick", msg); location.reload(); }
 
 function tier(dob) {
   if (!dob) return null;
@@ -296,9 +361,16 @@ const err = m => { $("err").textContent = m || ""; };
 
 let me = { name: "", role: "guest", age: "" };
 function enter(u, d) {
-  me = { name: u, role: d ? d.role || "user" : "guest", age: d ? d.age || "" : "" };
+  me = { name: u, role: d ? d.role || "user" : "guest", age: d ? d.age || "" : "", avatar: d ? d.avatar || "" : "" };
+  lastAct = began = Date.now();
   $("gate").classList.add("hide");
   $("who").textContent = u;
+  $("av").textContent = me.avatar || u[0].toUpperCase();
+  markAv();
+  const g = me.role === "guest";
+  $("ct-mail").classList.toggle("hide", !g); $("ct-age").classList.toggle("hide", !g); $("ct-shotrow").classList.toggle("hide", g);
+  $("upform").classList.toggle("hide", !isDev());
+  $("rolebadge").textContent = { owner: "Owner", dev: "Dev", admin: "Admin", user: "Member", guest: "Guest" }[me.role] || "Member";
   $("nav-admin").classList.toggle("hide", !isAdmin());
   $("del").classList.toggle("hide", me.role === "guest");
   const em = d && sessionKey && d.gmail ? unwrap(d.gmail, sessionKey) : null;
@@ -337,6 +409,7 @@ $("signup-form").addEventListener("submit", async e => {
   const u = $("su-user").value.trim(), dob = $("su-dob").value, pw = $("su-pass").value;
   const age = tier(dob);
   if (!age) return err("Enter a valid birth date that isn't in the future.");
+  if (!/^[A-Za-z0-9_.-]{3,24}$/.test(u)) return err("Usernames can use letters, numbers, _ . - (3 to 24 characters).");
   if (pw.length < 6) return err("Use a password with at least 6 characters.");
   const btn = e.submitter; btn.disabled = true;
   try {
@@ -376,7 +449,7 @@ $("login-form").addEventListener("submit", async e => {
 });
 
 $("guest").onclick = e => { e.preventDefault(); enter("guest_" + Math.floor(Math.random() * 100000)); };
-$("logout").onclick = () => { clearInterval(beat); location.reload(); };
+$("logout").onclick = () => signOut();
 $("li-user").value = localStorage.getItem("lastUser") || ""; // prefill only; password always required
 const kick = sessionStorage.getItem("kick"); // shown on the login screen after a ban/deletion kick
 if (kick) { err(kick); sessionStorage.removeItem("kick"); }
@@ -393,7 +466,8 @@ const tabs = [...document.querySelectorAll(".side-item")];
 function switchTab(id) {
   if (id === "admin" && !isAdmin()) return;
   if (id === "admin") loadAdmin();
-  if (id === "chat") pollChat(true);
+  if (id === "chat" && !window.listenChat) pollChat(true);
+  if (id === "updates") loadUpdates();
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === id));
   tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === id));
 }
@@ -412,6 +486,23 @@ $("bright").oninput = e => {
   $("dim").style.opacity = (100 - e.target.value) / 100 * 0.85;
 };
 $("sound").oninput = e => { $("sound-v").textContent = e.target.value + "%"; };
+
+/* ---------- themes ---------- */
+const THEMES = { grape: ["#3b1a63", "#7a4bb8", "#a3d95c"], ocean: ["#0b3c5d", "#1d7fb8", "#7be0d1"], sunset: ["#5a1a2e", "#d0553a", "#ffc857"], mint: ["#0f4a3c", "#2f9e7a", "#e9f77a"], rose: ["#4a1236", "#c2417f", "#ffd6e8"] };
+function setTheme(n) {
+  const [a, b, c] = THEMES[n] || THEMES.grape, r = document.documentElement.style;
+  r.setProperty("--grape", a); r.setProperty("--grape2", b); r.setProperty("--leaf", c);
+  document.querySelectorAll(".sw").forEach(x => x.classList.toggle("on", x.dataset.theme === n));
+  localStorage.setItem("theme", n);
+}
+Object.entries(THEMES).forEach(([n, [a, b, c]]) => {
+  const el = document.createElement("button");
+  el.className = "sw"; el.dataset.theme = n; el.title = n; el.setAttribute("aria-label", n + " theme");
+  el.style.background = `linear-gradient(135deg,${b} 50%,${c} 50%)`;
+  el.onclick = () => setTheme(n);
+  $("sws").appendChild(el);
+});
+setTheme(localStorage.getItem("theme") || "grape");
 
 /* ---------- pixel art ---------- */
 const ART = [
@@ -455,7 +546,10 @@ $("dl").onclick = () => {
 const OWNER = "MattyGrapeGreenOwner"; // register this name first; the owner role is granted at sign-up
 const ROOT = DB.slice(0, -6);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const isAdmin = () => me.role === "admin" || me.role === "owner";
+const RANK = { guest: 0, user: 1, admin: 2, dev: 3, owner: 4 }; // owner > dev > admin > user > guest
+const rk = r => RANK[r] ?? 1;
+const isAdmin = () => rk(me.role) >= 2;
+const isDev = () => rk(me.role) >= 3;
 const banLeft = d => d.banUntil === -1 ? Infinity : Math.max(0, (d.banUntil || 0) - Date.now());
 const banText = d => banLeft(d) === Infinity ? "permanently banned" : `banned for ${Math.ceil(banLeft(d) / 36e5)} more hour(s)`;
 
@@ -517,6 +611,8 @@ function ping() {
     o.frequency.value = 660; g.gain.value = v * .15; o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + .12); } catch {}
 }
 let lastMsgs = [], seen = 0, lastSend = 0;
+const CHAT_KEY = CryptoJS.SHA256("GrapeGreen chat key v1"); // shared key: hides messages from casual database viewers only
+const dec = x => unwrap(x || "", CHAT_KEY) ?? x; // old plain messages still show
 function render() {
   const box = $("msgs"), near = box.scrollHeight - box.scrollTop - box.clientHeight < 60, ts = $("ts").checked;
   const kidViewer = me.age === "1";
@@ -524,22 +620,38 @@ function render() {
     const kidMsg = m.k === "1";
     if (kidViewer && !kidMsg) return ""; // kids only see other kids
     if (kidMsg && !kidViewer && !isAdmin()) return '<p class="msg"><span class="kidbox" tabindex="0" title="Only kids can see this" data-tip="Only kids can see this"></span></p>';
-    const del = isAdmin() ? ` <a href="#" data-del="${esc(m.id)}" class="mute">delete</a>` : "";
+    const acts = (isAdmin() ? ` <a href="#" data-del="${esc(m.id)}" class="mute">delete</a>` : "") +
+      (me.role !== "guest" && m.u !== me.name ? ` <a href="#" data-rep="${esc(m.id)}" class="mute">report</a>` : "");
     const time = ts ? `<small>${new Date(m.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small> ` : "";
-    const tag = m.r === "owner" || m.r === "admin" ? `<span class="tag">${m.r}</span>` : kidMsg ? '<span class="tag">kid</span>' : "";
-    return `<p class="msg">${time}<b>${esc(m.u)}</b>${tag}: ${fmt(m.x)}${del}</p>`;
+    const tag = ["owner", "dev", "admin"].includes(m.r) ? `<span class="tag">${m.r}</span>` : kidMsg ? '<span class="tag">kid</span>' : "";
+    const av = AVATARS.includes(m.a) ? m.a + " " : "";
+    return `<p class="msg">${time}${av}<b>${esc(m.u)}</b>${tag}: ${fmt(filt(m.x || ""))}${acts}</p>`;
   }).join("");
   box.innerHTML = html || '<p class="mute">No messages yet. Say hi!</p>';
   if (near) box.scrollTop = box.scrollHeight;
 }
 $("msgs").addEventListener("click", async e => {
-  const id = e.target.dataset.del;
-  if (!id) return;
+  const del = e.target.dataset.del, rp = e.target.dataset.rep;
+  if (!del && !rp) return;
   e.preventDefault();
-  if (!isAdmin()) return;
-  try { await fetch(`${ROOT}/chat/${encodeURIComponent(id)}${KEY}`, { method: "DELETE" }); seen = 0; pollChat(true); } catch {}
+  try {
+    if (del && isAdmin()) { await fetch(`${ROOT}/chat/${encodeURIComponent(del)}${KEY}`, { method: "DELETE" }); if (!window.listenChat) { seen = 0; pollChat(true); } }
+    if (rp) {
+      const m = lastMsgs.find(x => x.id === rp); if (!m) return;
+      await add("reports", { type: "message", msgId: m.id, author: m.u, text: cleanText(m.x).slice(0, 300), by: me.name, t: Date.now() });
+      toast("Reported. Thanks!");
+    }
+  } catch { toast("That didn't work. Try again."); }
 });
-const pick = d => { const o = parseDoc(d); return { id: o.id, u: o.u, x: o.x, r: o.r, k: o.k, t: o.t }; };
+function applyDocs(list) { // realtime: called whenever chat changes, no refresh needed
+  const had = seen;
+  lastMsgs = list.map(o => ({ id: o.id, u: o.u, x: dec(o.x), r: o.r, k: o.k, a: o.a, t: o.t })).reverse();
+  if (had && lastMsgs.some(m => m.t > had && m.u !== me.name)) ping();
+  const n = lastMsgs[lastMsgs.length - 1];
+  if (n) seen = n.t;
+  render();
+}
+const pick = d => { const o = parseDoc(d); return { id: o.id, u: o.u, x: dec(o.x), r: o.r, k: o.k, a: o.a, t: o.t }; };
 let tick = 0;
 async function pollChat(force) {
   if (document.hidden || (!force && !$("chat").classList.contains("active"))) return; // no reads unless chat is open
@@ -568,11 +680,12 @@ function startChat() {
   const guest = me.role === "guest";
   $("chat-in").disabled = guest;
   $("chat-in").placeholder = guest ? "Log in to send messages (guests are read-only)" : "Say something...";
-  pollChat(true); setInterval(pollChat, 5000);
+  const poll = () => { pollChat(true); setInterval(pollChat, 5000); };
+  if (window.listenChat) window.listenChat(applyDocs, poll); else poll(); // realtime, with polling as backup
 }
 $("chat-form").addEventListener("submit", async e => {
   e.preventDefault();
-  const x = $("chat-in").value.trim().slice(0, 500);
+  const x = cleanText($("chat-in").value).slice(0, 500);
   if (!x || me.role === "guest" || Date.now() - lastSend < 1500) return;
   const kid = me.age === "1";
   // kids can't post links, emails or phone numbers
@@ -583,7 +696,7 @@ $("chat-form").addEventListener("submit", async e => {
     if (!d || d.deletedAt || banLeft(d)) return watch();
     $("chat-in").value = "";
     await fetch(`${ROOT}/chat${KEY}`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fields: { u: { stringValue: me.name }, x: { stringValue: clean }, k: { stringValue: kid ? "1" : "0" }, r: { stringValue: me.role }, t: { integerValue: String(Date.now()) } } }) });
+      body: JSON.stringify({ fields: { u: { stringValue: me.name }, x: { stringValue: wrap(filt(clean), CHAT_KEY) }, a: { stringValue: me.avatar || "" }, k: { stringValue: kid ? "1" : "0" }, r: { stringValue: me.role }, t: { integerValue: String(Date.now()) } } }) });
     pollChat();
   } catch { toast("Message didn't send. Try again."); }
 });
@@ -614,6 +727,7 @@ $("del-ok").onclick = async () => {
 let users = [];
 async function loadAdmin() {
   $("a-binbox").classList.toggle("hide", me.role !== "owner");
+  loadReports();
   try {
     const r = await fetch(`${DB}${KEY}&pageSize=300`);
     users = ((await r.json()).documents || []).map(parseDoc);
@@ -625,14 +739,18 @@ async function loadAdmin() {
   $("a-users").innerHTML = "<table><tr><th>User</th><th>Role</th><th>Status</th></tr>" + live.map(u =>
     `<tr><td><a href="#" data-pick="${esc(u.id)}">${esc(u.id)}</a></td><td>${esc(u.role || "user")}</td><td>${banLeft(u) ? banText(u) : "active"}</td></tr>`).join("") + "</table>";
   $("a-bin").innerHTML = bin.length ? "<table><tr><th>User</th><th>Days left</th><th></th></tr>" + bin.map(u =>
-    `<tr><td>${esc(u.id)}</td><td>${Math.ceil((u.purgeAt - now) / 864e5)}</td><td><button class="btn" data-restore="${esc(u.id)}">Restore</button>${u.extUsed ? "" : ` <button class="btn" data-ext="${esc(u.id)}">+7 days</button>`}</td></tr>`).join("") + "</table>" : '<p class="mute">The bin is empty.</p>';
+    `<tr><td>${esc(u.id)}</td><td>${Math.ceil((u.purgeAt - now) / 864e5)}</td><td><button class="btn" data-restore="${esc(u.id)}">Restore</button> <button class="btn red" data-perm="${esc(u.id)}">Perm delete</button>${u.extUsed ? "" : ` <button class="btn" data-ext="${esc(u.id)}">+7 days</button>`}</td></tr>`).join("") + "</table>" : '<p class="mute">The bin is empty.</p>';
 }
 $("admin").addEventListener("click", async e => {
   const t = e.target, msg = m => { $("a-msg").textContent = m; };
   if (t.dataset.pick) { e.preventDefault(); $("a-user").value = t.dataset.pick; return; }
   if (!isAdmin()) return;
   try {
-    if (t.dataset.restore || t.dataset.ext) {
+    if (t.dataset.perm) { // owner only, two clicks to confirm
+      if (me.role !== "owner") return;
+      if (t.dataset.armed !== "1") { t.dataset.armed = "1"; t.textContent = "Sure? Click again"; setTimeout(() => { t.dataset.armed = ""; t.textContent = "Perm delete"; }, 4000); return; }
+      await fetch(`${DB}/${encodeURIComponent(t.dataset.perm)}${KEY}`, { method: "DELETE" }); msg("Permanently deleted.");
+    } else if (t.dataset.restore || t.dataset.ext) {
       if (me.role !== "owner") return;
       if (t.dataset.restore) { await patch(t.dataset.restore, {}, ["deletedAt", "purgeAt"]); msg("Restored."); }
       else {
@@ -643,18 +761,120 @@ $("admin").addEventListener("click", async e => {
     } else if (t.dataset.a) {
       const a = t.dataset.a, u = users.find(x => x.id === $("a-user").value.trim() && !x.deletedAt);
       if (!u) return msg("No user with that name.");
-      const ownerOnly = a === "promote" || a === "demote";
-      if (u.role === "owner" || (u.role === "admin" && me.role !== "owner") || (ownerOnly && me.role !== "owner") || (u.id === me.name && a !== "unban"))
-        return msg("You can't do that to this account.");
+      const mine = rk(me.role), theirs = rk(u.role || "user"), nr = a.startsWith("role:") ? a.slice(5) : null;
+      // you can only act on people ranked below you; roles and deletes need dev or owner
+      if (theirs >= mine || u.id === me.name || ((nr || a === "delete") && mine < 3) || (nr && rk(nr) >= mine)) return msg("You can't do that to this account.");
       if (a === "ban") { const h = Number($("a-hours").value); if (!(h > 0)) return msg("Enter ban hours."); await patch(u.id, { banUntil: Date.now() + h * 36e5 }); }
       else if (a === "perm") await patch(u.id, { banUntil: -1 });
       else if (a === "unban") await patch(u.id, { banUntil: 0 });
-      else await patch(u.id, { role: a === "promote" ? "admin" : "user" });
+      else if (a === "delete") await patch(u.id, { deletedAt: Date.now(), purgeAt: Date.now() + 90 * 864e5 });
+      else await patch(u.id, { role: nr });
       msg("Done.");
     } else return;
     loadAdmin();
   } catch (x) { console.error(x); msg("That didn't work. Check your connection and rules."); }
 });
+
+/* ---------- safety helpers ---------- */
+const cleanText = t => String(t).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/\bon[a-z]{3,}\s*=/gi, "").replace(/javascript\s*:/gi, "").trim(); // no onload=, onerror= etc. (output is HTML-escaped too)
+const BAD = ["fuck", "shit", "bitch", "asshole", "bastard", "dick", "cunt", "slut", "whore", "piss"]; // add more words here
+const LEET = { a: "[a4@]", e: "[e3]", i: "[i1!]", o: "[o0]", s: "[s5$]", t: "[t7]" };
+const BAD_RX = new RegExp(BAD.map(w => "(?<![a-z])" + [...w].map(c => LEET[c] || c).join("[\\W_]*") + "(?![a-z])").join("|"), "gi");
+const filt = t => t.replace(BAD_RX, m => "*".repeat(m.length));
+
+const fv = v => typeof v === "number" ? { integerValue: String(v) } : typeof v === "boolean" ? { booleanValue: v } : { stringValue: String(v) };
+const post = (path, set, method) => fetch(`${ROOT}/${path}${KEY}`, { method, headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ fields: Object.fromEntries(Object.entries(set).map(([k, v]) => [k, fv(v)])) }) }).then(r => { if (!r.ok) throw new Error(r.status); });
+const add = (col, set) => post(col, set, "POST");
+const put = (path, set) => post(path, set, "PATCH");
+
+/* ---------- idle sign-out (60 min) and guest expiry (1 hour) ---------- */
+let lastAct = Date.now(), began = Date.now();
+["mousemove", "keydown", "click", "touchstart", "scroll"].forEach(ev => addEventListener(ev, () => { lastAct = Date.now(); }, { passive: true }));
+setInterval(() => {
+  if (!$("gate").classList.contains("hide")) return;
+  if (Date.now() - lastAct > 36e5) signOut("You were signed out after 60 idle minutes.");
+  else if (me.role === "guest" && Date.now() - began > 36e5) signOut("Guest sessions end after 1 hour.");
+}, 30000);
+
+/* ---------- avatars ---------- */
+const AVATARS = Array.from("🐶🐱🦊🐼🐸🦁🐯🐵🐧🦉🐙🦄🐢🐳🦋🐝🐲🦖🤖👽👻🎃🍇🍉🍕🍩⚽🎮🚀🌈");
+const markAv = () => document.querySelectorAll(".av-b").forEach(b => b.classList.toggle("on", b.textContent === me.avatar));
+AVATARS.forEach(e => {
+  const b = document.createElement("button");
+  b.className = "av-b"; b.textContent = e; b.setAttribute("aria-label", "Avatar " + e);
+  b.onclick = async () => {
+    if (me.role === "guest") return toast("Log in to pick an avatar.");
+    try { await patch(me.name, { avatar: e }); me.avatar = e; $("av").textContent = e; markAv(); } catch { toast("Couldn't save your avatar."); }
+  };
+  $("avs").appendChild(b);
+});
+
+/* ---------- update log ---------- */
+const UP0 = [
+  { v: "v1.0", title: "Fresh start", notes: "New login screen\nUnder-13 sign-ups keep only a username and password hash\nFirestore sign-up and login" },
+  { v: "v1.1", title: "Chat & Admin", notes: "Global chat with bold, underline and hidden text\nAdmin panel: ban, promote, demote\nDelete account with a 90-day bin" },
+  { v: "v1.2", title: "Security+", notes: "Email and birthday encrypted (Base64, AES-256, Base16)\nKids-only chat room\nThemes and a new Settings page\nNo more alert() pop-ups" }
+];
+const VOK = /^v\d+(\.\d+)*$/;
+const vcmp = (a, b) => { const x = a.slice(1).split(".").map(Number), y = b.slice(1).split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (y[i] || 0) - (x[i] || 0); if (d) return d; } return 0; };
+let ups = [];
+async function loadUpdates() {
+  const m = new Map(UP0.map(e => [e.v, e]));
+  try { const r = await fetch(`${ROOT}/updates${KEY}&pageSize=100`);
+    ((await r.json()).documents || []).map(parseDoc).forEach(o => { if (VOK.test(o.v || "")) m.set(o.v, { v: o.v, title: o.title || "", notes: o.notes || "" }); }); } catch {}
+  ups = [...m.values()].sort((a, b) => vcmp(a.v, b.v));
+  $("upl").innerHTML = ups.map(e => `<div class="card" style="max-width:560px;margin-bottom:12px"><h3>${esc(e.v)}${isDev() ? ` · <a href="#" data-up="${esc(e.v)}">edit</a>` : ""}</h3><b>${esc(e.title)}</b><ul>${e.notes.split("\n").filter(Boolean).map(l => `<li>${esc(l)}</li>`).join("")}</ul></div>`).join("");
+}
+$("upl").addEventListener("click", e => {
+  const u = ups.find(x => x.v === e.target.dataset.up); if (!u) return;
+  e.preventDefault(); $("up-v").value = u.v; $("up-t").value = u.title; $("up-n").value = u.notes;
+});
+$("up-save").onclick = async () => {
+  const msg = t => { $("up-msg").textContent = t; }, v = $("up-v").value.trim();
+  if (!isDev()) return;
+  if (!VOK.test(v)) return msg("Version must look like v1.3 (only v, numbers and dots).");
+  const title = cleanText($("up-t").value).slice(0, 60), notes = cleanText($("up-n").value).slice(0, 800);
+  if (!title) return msg("Add a title.");
+  try { await put("updates/" + encodeURIComponent(v), { v, title, notes }); msg("Saved."); loadUpdates(); } catch { msg("Couldn't save."); }
+};
+
+/* ---------- help / contact us ---------- */
+const shrink = file => new Promise((ok, no) => { // screenshot -> 144p JPEG
+  const img = new Image();
+  img.onload = () => { const h = 144, w = Math.max(1, Math.round(img.width * h / img.height)), c = document.createElement("canvas");
+    c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h); URL.revokeObjectURL(img.src); ok(c.toDataURL("image/jpeg", 0.6)); };
+  img.onerror = no; img.src = URL.createObjectURL(file);
+});
+$("ct-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const msg = t => { $("ct-msg").textContent = t; }, guest = me.role === "guest";
+  const doc = { type: "contact", by: guest ? "guest" : me.name, title: cleanText($("ct-title").value).slice(0, 80), details: cleanText($("ct-det").value).slice(0, 1000), t: Date.now() };
+  if (guest) {
+    const g = $("ct-mail").value.trim();
+    if (!/^[^\s@]+@gmail\.com$/i.test(g)) return msg("Enter a Gmail address so we can reply.");
+    if (!$("ct-13").checked) return msg("You need to be 13 or older to give us an email.");
+    doc.gmail = wrap(g, CHAT_KEY);
+  } else if ($("ct-shot").files[0]) {
+    const f = $("ct-shot").files[0];
+    if (!f.type.startsWith("image/")) return msg("Screenshots must be images.");
+    try { doc.shot = await shrink(f); } catch { return msg("Couldn't read that image."); }
+  }
+  try { await add("reports", doc); $("ct-form").reset(); msg("Sent. Thanks!"); } catch { msg("Couldn't send. Try again."); }
+});
+const okImg = x => /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(x || "");
+async function loadReports() {
+  try {
+    const r = await fetch(`${ROOT}/reports${KEY}&orderBy=t%20desc&pageSize=50`);
+    const rows = ((await r.json()).documents || []).map(parseDoc);
+    $("a-reports").innerHTML = rows.length ? "<table><tr><th>Type</th><th>From</th><th>Details</th><th>When</th></tr>" + rows.map(o => {
+      const from = o.gmail ? esc(unwrap(o.gmail, CHAT_KEY) || "?") + " (guest)" : esc(o.by || "?");
+      const body = o.type === "message" ? `${esc(o.author)} said: ${esc(o.text)}` : `<b>${esc(o.title)}</b><br>${esc(o.details)}${okImg(o.shot) ? `<br><img src="${o.shot}" alt="screenshot">` : ""}`;
+      return `<tr><td>${esc(o.type)}</td><td>${from}</td><td>${body}</td><td>${esc(new Date(o.t).toLocaleString())}</td></tr>`;
+    }).join("") + "</table>" : '<p class="mute">Nothing yet.</p>';
+  } catch { $("a-reports").textContent = "Couldn't load reports."; }
+}
 
 /* ---------- code advice ---------- */
 const SKELETON = `<!DOCTYPE html>
