@@ -104,6 +104,13 @@ input[type=checkbox]{accent-color:var(--grape2);width:18px;height:18px}
 .av-b{width:40px;height:40px;font-size:22px;padding:0;border:2px solid var(--line);border-radius:10px;background:#fff}
 .av-b.on{border-color:var(--grape2);background:var(--paper)}
 td img{display:block;margin-top:6px;border:1px solid var(--line);border-radius:6px}
+#upl ul{padding:0;margin:8px 0 0}
+.ch{list-style:none;margin:6px 0;padding:6px 10px;border-radius:8px;border-left:4px solid}
+.ch b{font-size:11px;letter-spacing:.05em;margin-right:8px}
+.ch.add{background:#e6f7ea;border-color:#2e9e4f;color:#14532d}
+.ch.chg{background:#fff6d6;border-color:#e0a800;color:#6b4e00}
+.ch.rem{background:#fde8e8;border-color:#d63b3b;color:#7f1d1d}
+.ch.pl{border-color:var(--line)}
 @media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}}
 </style>
 </head>
@@ -812,20 +819,25 @@ AVATARS.forEach(e => {
 
 /* ---------- update log ---------- */
 const UP0 = [
-  { v: "v1.0", title: "Fresh start", notes: "New login screen\nUnder-13 sign-ups keep only a username and password hash\nFirestore sign-up and login" },
-  { v: "v1.1", title: "Chat & Admin", notes: "Global chat with bold, underline and hidden text\nAdmin panel: ban, promote, demote\nDelete account with a 90-day bin" },
-  { v: "v1.2", title: "Security+", notes: "Email and birthday encrypted (Base64, AES-256, Base16)\nKids-only chat room\nThemes and a new Settings page\nNo more alert() pop-ups" }
+  { v: "v1.0", title: "Fresh start", notes: "+ New login screen\n+ Under-13 sign-ups keep only a username and password hash\n+ Firestore sign-up and login" },
+  { v: "v1.1", title: "Chat & Admin", notes: "+ Global chat with bold, underline and hidden text\n+ Admin panel: ban, promote, demote\n+ Delete account with a 90-day bin" },
+  { v: "v1.2", title: "Security+", notes: "+ Email and birthday encrypted \n+ Kids-only chat room\n~ Settings page redesigned with themes\n- Removed alert() pop-ups" }
 ];
 const VOK = /^v\d+(\.\d+)*$/;
 const vcmp = (a, b) => { const x = a.slice(1).split(".").map(Number), y = b.slice(1).split(".").map(Number);
   for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (y[i] || 0) - (x[i] || 0); if (d) return d; } return 0; };
+const CH = { "+": ["add", "ADD"], "~": ["chg", "CHANGE"], "-": ["rem", "REMOVE"] };
+const chLine = l => {
+  const k = CH[l[0]], t = k ? l.slice(1).trim() : l;
+  return `<li class="ch ${k ? k[0] : "pl"}">${k ? `<b>${k[1]}</b>` : ""}${esc(t)}</li>`;
+};
 let ups = [];
 async function loadUpdates() {
   const m = new Map(UP0.map(e => [e.v, e]));
   try { const r = await fetch(`${ROOT}/updates${KEY}&pageSize=100`);
     ((await r.json()).documents || []).map(parseDoc).forEach(o => { if (VOK.test(o.v || "")) m.set(o.v, { v: o.v, title: o.title || "", notes: o.notes || "" }); }); } catch {}
   ups = [...m.values()].sort((a, b) => vcmp(a.v, b.v));
-  $("upl").innerHTML = ups.map(e => `<div class="card" style="max-width:560px;margin-bottom:12px"><h3>${esc(e.v)}${isDev() ? ` · <a href="#" data-up="${esc(e.v)}">edit</a>` : ""}</h3><b>${esc(e.title)}</b><ul>${e.notes.split("\n").filter(Boolean).map(l => `<li>${esc(l)}</li>`).join("")}</ul></div>`).join("");
+  $("upl").innerHTML = ups.map(e => `<div class="card" style="max-width:560px;margin-bottom:12px"><h3>${esc(e.v)}${isDev() ? ` · <a href="#" data-up="${esc(e.v)}">edit</a>` : ""}</h3><b>${esc(e.title)}</b><ul>${e.notes.split("\n").filter(Boolean).map(chLine).join("")}</ul></div>`).join("");
 }
 $("upl").addEventListener("click", e => {
   const u = ups.find(x => x.v === e.target.dataset.up); if (!u) return;
