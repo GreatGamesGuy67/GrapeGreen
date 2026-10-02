@@ -225,6 +225,11 @@ td img{display:block;margin-top:6px;border:1px solid var(--line);border-radius:6
           <input id="sound" type="range" min="0" max="100" value="80"></div>
         <label class="row" style="flex-direction:row;align-items:center;gap:8px"><input id="ts" type="checkbox" checked> Show timestamps</label>
       </div>
+      <div class="card"><h3>🔒 Password</h3>
+        <input class="fld" id="mypw-cur" type="password" placeholder="Current password" autocomplete="current-password">
+        <input class="fld" id="mypw-new" type="password" placeholder="New password" autocomplete="new-password">
+        <button class="btn" id="mypw-save">Change password</button> <span class="mute" id="mypw-msg"></span>
+      </div>
       <div class="card danger"><h3>⚠️ Account</h3>
         <button class="btn" id="logout">Log out</button>
         <button class="btn red" id="del" style="margin-left:8px">Delete account</button>
@@ -446,9 +451,16 @@ function enter(u, d) {
   const g = me.role === "guest";
   $("ct-mail").classList.toggle("hide", !g); $("ct-age").classList.toggle("hide", !g); $("ct-shotrow").classList.toggle("hide", g);
   $("upform").classList.toggle("hide", !isDev());
-  $("rolebadge").textContent = { owner: "Owner", dev: "Dev", admin: "Admin", user: "Member", guest: "Guest" }[me.role] || "Member";
-  $("nav-admin").classList.toggle("hide", !isAdmin());
+  $("rolebadge").textContent = RNAME[me.role] || "Member";
+  if (me.role === "mod") $("rolebadge").insertAdjacentHTML("afterend", ' <span class="chk" title="Verified moderator">&check;</span>');
+  $("nav-admin").classList.toggle("hide", !isMod());
+  $("nav-legal").classList.toggle("hide", !isLegal());
   $("del").classList.toggle("hide", me.role === "guest");
+  $("acc-card").classList.toggle("hide", !isDev());
+  $("pw-card").classList.toggle("hide", !isAdmin());
+  $("bot-card").classList.toggle("hide", !canBot());
+  listenMine();
+  loadMotd();
   const em = d && sessionKey && d.gmail ? unwrap(d.gmail, sessionKey) : null;
   const bd = d && sessionKey && d.dob ? unwrap(d.dob, sessionKey) : null;
   $("mine").textContent = em ? `Email: ${em}${bd ? " · Born: " + bd : ""} (stored encrypted)` : "";
@@ -540,8 +552,11 @@ if (kick) { err(kick); sessionStorage.removeItem("kick"); }
 /* ---------- tabs & search ---------- */
 const tabs = [...document.querySelectorAll(".side-item")];
 function switchTab(id) {
-  if (id === "admin" && !isAdmin()) return;
+  if (id === "admin" && !isMod()) return;
+  if (id === "legal" && !isLegal()) return;
   if (id === "admin") loadAdmin();
+  if (id === "legal") loadLegal();
+  if (id === "tos") loadTos();
   if (id === "chat" && !window.listenChat) pollChat(true);
   if (id === "updates") loadUpdates();
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === id));
@@ -622,10 +637,15 @@ $("dl").onclick = () => {
 const OWNER = "MattyGrapeGreenOwner"; // register this name first; the owner role is granted at sign-up
 const ROOT = DB.slice(0, -6);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const RANK = { guest: 0, user: 1, admin: 2, dev: 3, owner: 4 }; // owner > dev > admin > user > guest
+const RANK = { guest: 0, user: 1, mod: 2, admin: 3, headadmin: 4, legal: 5, dev: 6, owner: 7 }; // owner > dev > legal > head admin > admin > mod > user > guest
+const RNAME = { guest: "Guest", user: "Member", mod: "Mod", admin: "Admin", headadmin: "Head Admin", legal: "Legal", dev: "Dev", owner: "Owner" };
 const rk = r => RANK[r] ?? 1;
-const isAdmin = () => rk(me.role) >= 2;
-const isDev = () => rk(me.role) >= 3;
+const isMod = () => rk(me.role) >= 2;       // mod+: temp ban, accept tickets, delete chat messages
+const isAdmin = () => rk(me.role) >= 3;     // admin+: perm ban, delete accounts
+const isHeadAdmin = () => rk(me.role) >= 4; // head admin+: change roles within their reach
+const canBot = () => ["dev", "owner", "headadmin"].includes(me.role);
+const isLegal = () => me.role === "legal" || me.role === "owner";
+const isDev = () => rk(me.role) >= 6;       // dev+: create accounts, reset passwords, update log, bots, commands
 const banLeft = d => d.banUntil === -1 ? Infinity : Math.max(0, (d.banUntil || 0) - Date.now());
 const banText = d => banLeft(d) === Infinity ? "permanently banned" : `banned for ${Math.ceil(banLeft(d) / 36e5)} more hour(s)`;
 
@@ -671,7 +691,7 @@ async function watch() { // every 30s: kick out banned/deleted users, sync role 
     const d = await getUser(me.name);
     const bad = !d ? "no longer exists" : d.deletedAt ? "deleted" : banLeft(d) ? banText(d) : "";
     if (bad) { sessionStorage.setItem("kick", "Your account is " + bad + "."); return location.reload(); }
-    if ((d.role || "user") !== me.role) { me.role = d.role || "user"; $("nav-admin").classList.toggle("hide", !isAdmin()); }
+    if ((d.role || "user") !== me.role) { me.role = d.role || "user"; $("nav-admin").classList.toggle("hide", !isMod()); $("nav-legal").classList.toggle("hide", !isLegal()); }
   } catch {}
 }
 
@@ -695,11 +715,12 @@ function render() {
   const html = lastMsgs.map(m => {
     const kidMsg = m.k === "1";
     if (kidViewer && !kidMsg) return ""; // kids only see other kids
-    if (kidMsg && !kidViewer && !isAdmin()) return '<p class="msg"><span class="kidbox" tabindex="0" title="Only kids can see this" data-tip="Only kids can see this"></span></p>';
-    const acts = (isAdmin() ? ` <a href="#" data-del="${esc(m.id)}" class="mute">delete</a>` : "") +
+    if (kidMsg && !kidViewer && !isMod()) return '<p class="msg"><span class="kidbox" tabindex="0" title="Only kids can see this" data-tip="Only kids can see this"></span></p>';
+    const acts = m.local ? "" : (isMod() ? ` <a href="#" data-del="${esc(m.id)}" class="mute">delete</a>` : "") +
       (me.role !== "guest" && m.u !== me.name ? ` <a href="#" data-rep="${esc(m.id)}" class="mute">report</a>` : "");
-    const time = ts ? `<small>${new Date(m.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small> ` : "";
-    const tag = ["owner", "dev", "admin"].includes(m.r) ? `<span class="tag">${m.r}</span>` : kidMsg ? '<span class="tag">kid</span>' : "";
+    const time = ts && !m.local ? `<small>${new Date(m.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small> ` : "";
+    const tag = m.r === "bot" ? '<span class="tag">bot</span>' : rk(m.r) >= 3 ? `<span class="tag">${m.r}</span>`
+      : m.r === "mod" ? '<span class="tag">mod</span> <span class="chk" title="Verified moderator">&check;</span>' : kidMsg ? '<span class="tag">kid</span>' : "";
     const av = AVATARS.includes(m.a) ? m.a + " " : "";
     return `<p class="msg">${time}${av}<b>${esc(m.u)}</b>${tag}: ${fmt(filt(m.x || ""))}${acts}</p>`;
   }).join("");
@@ -711,7 +732,7 @@ $("msgs").addEventListener("click", async e => {
   if (!del && !rp) return;
   e.preventDefault();
   try {
-    if (del && isAdmin()) { await fetch(`${ROOT}/chat/${encodeURIComponent(del)}${KEY}`, { method: "DELETE" }); if (!window.listenChat) { seen = 0; pollChat(true); } }
+    if (del && isMod()) { await fetch(`${ROOT}/chat/${encodeURIComponent(del)}${KEY}`, { method: "DELETE" }); if (!window.listenChat) { seen = 0; pollChat(true); } }
     if (rp) {
       const m = lastMsgs.find(x => x.id === rp); if (!m) return;
       await add("reports", { type: "message", msgId: m.id, author: m.u, text: cleanText(m.x).slice(0, 300), by: me.name, t: Date.now() });
@@ -761,7 +782,15 @@ function startChat() {
 }
 $("chat-form").addEventListener("submit", async e => {
   e.preventDefault();
-  const x = cleanText($("chat-in").value).slice(0, 500);
+  const raw = $("chat-in").value;
+  if (isDev() && raw.trim().startsWith("/")) {
+    $("chat-in").value = "";
+    const result = await runCommand(raw.trim());
+    lastMsgs = lastMsgs.concat([{ id: "local" + Date.now(), u: "System", x: result, r: "system", t: Date.now(), local: true }]).slice(-60);
+    render();
+    return;
+  }
+  const x = cleanText(raw).slice(0, 500);
   if (!x || me.role === "guest" || Date.now() - lastSend < 1500) return;
   const kid = me.age === "1";
   // kids can't post links, emails or phone numbers
@@ -770,6 +799,14 @@ $("chat-form").addEventListener("submit", async e => {
   try {
     const d = await getUser(me.name);
     if (!d || d.deletedAt || banLeft(d)) return watch();
+    const hit = await botCheck(clean, d);
+    if (hit) {
+      $("chat-in").value = "";
+      await add("chat", { u: "Bot: " + hit.name, x: wrap(hit.action === "ban" ? `${me.name}, that's strike ${hit.x}. Temp banned for ${hit.hours}h.` : `${me.name}, please watch your language.`, CHAT_KEY), a: "\uD83E\uDD16", k: "0", r: "bot", t: Date.now() });
+      if (hit.action === "ban") { await patch(me.name, { banUntil: Date.now() + hit.hours * 36e5 }); return watch(); }
+      pollChat();
+      return;
+    }
     $("chat-in").value = "";
     await fetch(`${ROOT}/chat${KEY}`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fields: { u: { stringValue: me.name }, x: { stringValue: wrap(filt(clean), CHAT_KEY) }, a: { stringValue: me.avatar || "" }, k: { stringValue: kid ? "1" : "0" }, r: { stringValue: me.role }, t: { integerValue: String(Date.now()) } } }) });
@@ -780,6 +817,27 @@ $("fsize").oninput = e => { $("fsize-v").textContent = e.target.value + "px"; $(
 $("ts").onchange = render;
 const fs0 = localStorage.getItem("fsize");
 if (fs0) { $("fsize").value = fs0; $("fsize").oninput({ target: $("fsize") }); }
+
+/* self-service password change; devs/owner need 20+ chars and can't reuse their last 5 */
+$("mypw-save").onclick = async () => {
+  const msg = t => { $("mypw-msg").textContent = t; };
+  if (me.role === "guest") return;
+  const cur = $("mypw-cur").value, next = $("mypw-new").value;
+  const minLen = rk(me.role) >= 6 ? 20 : 6;
+  if (next.length < minLen) return msg(`Devs and the owner need ${minLen}+ characters.`.replace("6+", "6+"));
+  try {
+    const d = await getUser(me.name);
+    if (!d || hash(cur, d.salt) !== d.hash) return msg("Current password is wrong.");
+    const hist = JSON.parse(d.pwHistory || "[]");
+    if (hist.some(h => hash(next, h.salt) === h.hash) || hash(next, d.salt) === d.hash) return msg("Don't reuse a recent password.");
+    const salt = CryptoJS.lib.WordArray.random(16).toString();
+    const newHist = [{ salt: d.salt, hash: d.hash }, ...hist].slice(0, 5);
+    await patch(me.name, { salt, passwordHash: hash(next, salt), pwHistory: JSON.stringify(newHist) });
+    sessionKey = deriveKey(next, salt);
+    $("mypw-cur").value = ""; $("mypw-new").value = "";
+    msg("Password changed.");
+  } catch { msg("Couldn't change the password."); }
+};
 
 /* delete account -> bin for 90 days */
 $("del").onclick = () => {
@@ -800,27 +858,31 @@ $("del-ok").onclick = async () => {
 };
 
 /* admin panel */
-let users = [];
+let users = [], reportsCache = [], bots = [], legalBin = [];
 async function loadAdmin() {
   $("a-binbox").classList.toggle("hide", me.role !== "owner");
-  loadReports();
+  loadReports("a-reports");
+  loadPwReqs();
+  loadBots();
   try {
     const r = await fetch(`${DB}${KEY}&pageSize=300`);
     users = ((await r.json()).documents || []).map(parseDoc);
   } catch { $("a-msg").textContent = "Couldn't load users."; return; }
   const now = Date.now();
-  users.filter(u => u.deletedAt && u.purgeAt < now).forEach(u => fetch(`${DB}/${encodeURIComponent(u.id)}${KEY}`, { method: "DELETE" }));
-  users = users.filter(u => !(u.deletedAt && u.purgeAt < now));
+  users.filter(u => u.deletedAt && !u.legalHold && u.purgeAt < now).forEach(u => fetch(`${DB}/${encodeURIComponent(u.id)}${KEY}`, { method: "DELETE" }));
+  users = users.filter(u => !(u.deletedAt && !u.legalHold && u.purgeAt < now));
   const live = users.filter(u => !u.deletedAt), bin = users.filter(u => u.deletedAt);
-  $("a-users").innerHTML = "<table><tr><th>User</th><th>Role</th><th>Status</th></tr>" + live.map(u =>
-    `<tr><td><a href="#" data-pick="${esc(u.id)}">${esc(u.id)}</a></td><td>${esc(u.role || "user")}</td><td>${banLeft(u) ? banText(u) : "active"}</td></tr>`).join("") + "</table>";
-  $("a-bin").innerHTML = bin.length ? "<table><tr><th>User</th><th>Days left</th><th></th></tr>" + bin.map(u =>
-    `<tr><td>${esc(u.id)}</td><td>${Math.ceil((u.purgeAt - now) / 864e5)}</td><td><button class="btn" data-restore="${esc(u.id)}">Restore</button> <button class="btn red" data-perm="${esc(u.id)}">Perm delete</button>${u.extUsed ? "" : ` <button class="btn" data-ext="${esc(u.id)}">+7 days</button>`}</td></tr>`).join("") + "</table>" : '<p class="mute">The bin is empty.</p>';
+  $("a-users").innerHTML = "<table><tr><th>User</th><th>Role</th><th>Status</th><th></th></tr>" + live.map(u =>
+    `<tr><td><a href="#" data-pick="${esc(u.id)}">${esc(u.id)}</a></td><td>${esc(u.role || "user")}</td><td>${banLeft(u) ? banText(u) : "active"}</td><td>${u.id !== me.name ? `<a href="#" data-dm="${esc(u.id)}">1-on-1</a>` : ""}</td></tr>`).join("") + "</table>";
+  $("a-bin").innerHTML = bin.length ? "<table><tr><th>User</th><th>Days left</th><th></th></tr>" + bin.map(u => u.legalHold
+    ? `<tr><td>${esc(u.id)}</td><td>on hold</td><td class="mute">Paused by Legal</td></tr>`
+    : `<tr><td>${esc(u.id)}</td><td>${Math.ceil((u.purgeAt - now) / 864e5)}</td><td><button class="btn" data-restore="${esc(u.id)}">Restore</button> <button class="btn red" data-perm="${esc(u.id)}">Perm delete</button>${u.extUsed ? "" : ` <button class="btn" data-ext="${esc(u.id)}">+7 days</button>`}</td></tr>`).join("") + "</table>" : '<p class="mute">The bin is empty.</p>';
 }
 $("admin").addEventListener("click", async e => {
   const t = e.target, msg = m => { $("a-msg").textContent = m; };
   if (t.dataset.pick) { e.preventDefault(); $("a-user").value = t.dataset.pick; return; }
-  if (!isAdmin()) return;
+  if (t.dataset.dm) { e.preventDefault(); if (me.role === "owner") openDM(t.dataset.dm); else invite(t.dataset.dm); return; }
+  if (!isMod()) return;
   try {
     if (t.dataset.perm) { // owner only, two clicks to confirm
       if (me.role !== "owner") return;
@@ -828,6 +890,8 @@ $("admin").addEventListener("click", async e => {
       await fetch(`${DB}/${encodeURIComponent(t.dataset.perm)}${KEY}`, { method: "DELETE" }); msg("Permanently deleted.");
     } else if (t.dataset.restore || t.dataset.ext) {
       if (me.role !== "owner") return;
+      const held = users.find(x => x.id === (t.dataset.restore || t.dataset.ext));
+      if (held && held.legalHold) return msg("Legal has paused this account; only Legal can unpause it.");
       if (t.dataset.restore) { await patch(t.dataset.restore, {}, ["deletedAt", "purgeAt"]); msg("Restored."); }
       else {
         const u = users.find(x => x.id === t.dataset.ext);
@@ -838,13 +902,13 @@ $("admin").addEventListener("click", async e => {
       const a = t.dataset.a, u = users.find(x => x.id === $("a-user").value.trim() && !x.deletedAt);
       if (!u) return msg("No user with that name.");
       const mine = rk(me.role), theirs = rk(u.role || "user"), nr = a.startsWith("role:") ? a.slice(5) : null;
-      // you can only act on people ranked below you; roles and deletes need dev or owner
-      if (theirs >= mine || u.id === me.name || ((nr || a === "delete") && mine < 3) || (nr && rk(nr) >= mine)) return msg("You can't do that to this account.");
-      if (a === "ban") { const h = Number($("a-hours").value); if (!(h > 0)) return msg("Enter ban hours."); await patch(u.id, { banUntil: Date.now() + h * 36e5 }); }
-      else if (a === "perm") await patch(u.id, { banUntil: -1 });
-      else if (a === "unban") await patch(u.id, { banUntil: 0 });
-      else if (a === "delete") await patch(u.id, { deletedAt: Date.now(), purgeAt: Date.now() + 90 * 864e5 });
-      else await patch(u.id, { role: nr });
+      if (a === "dm") { if (me.role === "owner") openDM(u.id); else invite(u.id); return; }
+      if (theirs >= mine || u.id === me.name) return msg("You can't do that to this account.");
+      if (nr) { if (!isHeadAdmin() || rk(nr) >= mine) return msg("You can't do that to this account."); await patch(u.id, { role: nr }); }
+      else if (a === "ban") { if (!isMod()) return; const h = Number($("a-hours").value); if (!(h > 0)) return msg("Enter ban hours."); await patch(u.id, { banUntil: Date.now() + h * 36e5 }); }
+      else if (a === "perm") { if (!isAdmin()) return msg("Admins and above only."); await patch(u.id, { banUntil: -1 }); }
+      else if (a === "unban") { if (!isMod()) return; await patch(u.id, { banUntil: 0 }); }
+      else if (a === "delete") { if (!isAdmin()) return msg("Admins and above only."); await patch(u.id, { deletedAt: Date.now(), purgeAt: Date.now() + 90 * 864e5 }); }
       msg("Done.");
     } else return;
     loadAdmin();
@@ -940,16 +1004,331 @@ $("ct-form").addEventListener("submit", async e => {
   try { await add("reports", doc); $("ct-form").reset(); msg("Sent. Thanks!"); } catch { msg("Couldn't send. Try again."); }
 });
 const okImg = x => /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(x || "");
-async function loadReports() {
+async function loadReports(target) {
   try {
     const r = await fetch(`${ROOT}/reports${KEY}&orderBy=t%20desc&pageSize=50`);
-    const rows = ((await r.json()).documents || []).map(parseDoc);
-    $("a-reports").innerHTML = rows.length ? "<table><tr><th>Type</th><th>From</th><th>Details</th><th>When</th></tr>" + rows.map(o => {
-      const from = o.gmail ? esc(unwrap(o.gmail, CHAT_KEY) || "?") + " (guest)" : esc(o.by || "?");
-      const body = o.type === "message" ? `${esc(o.author)} said: ${esc(o.text)}` : `<b>${esc(o.title)}</b><br>${esc(o.details)}${okImg(o.shot) ? `<br><img src="${o.shot}" alt="screenshot">` : ""}`;
-      return `<tr><td>${esc(o.type)}</td><td>${from}</td><td>${body}</td><td>${esc(new Date(o.t).toLocaleString())}</td></tr>`;
+    reportsCache = ((await r.json()).documents || []).map(parseDoc);
+    const visible = reportsCache.filter(o => o.status !== "transferred" || isLegal());
+    $(target).innerHTML = visible.length ? "<table><tr><th>Type</th><th>From</th><th>Status</th><th>When</th><th></th></tr>" + visible.map(o => {
+      const from = o.gmail ? "guest" : esc(o.by || "?");
+      const status = o.status === "accepted" ? `with ${esc(o.assignedTo || "?")}` : o.status === "transferred" ? "with Legal" : "open";
+      return `<tr><td>${esc(o.type)}</td><td>${from}</td><td>${status}</td><td>${esc(new Date(o.t).toLocaleString())}</td><td><button class="btn" data-ticket="${esc(o.id)}">Open</button></td></tr>`;
     }).join("") + "</table>" : '<p class="mute">Nothing yet.</p>';
-  } catch { $("a-reports").textContent = "Couldn't load reports."; }
+  } catch { $(target).textContent = "Couldn't load reports."; }
+}
+
+/* ---------- generic partial doc update (reports, pwreq, bots live outside the users collection) ---------- */
+async function patchDoc(path, set) {
+  const mask = Object.keys(set).map(k => "&updateMask.fieldPaths=" + k).join("");
+  const fields = {}; for (const k in set) fields[k] = fv(set[k]);
+  const r = await fetch(`${ROOT}/${path}${KEY}${mask}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields }) });
+  if (!r.ok) throw new Error("patch " + r.status);
+}
+
+/* ---------- tickets (chat reports & contact-us) ---------- */
+function ticketHTML(o) {
+  const canAct = isMod() && (o.status !== "transferred" || isLegal());
+  let body;
+  if (o.type === "message") {
+    body = `<p class="mute">Chat report</p><p><b>${esc(o.author)}</b> said: ${esc(o.text)}</p><p class="mute">Reported by ${esc(o.by)}</p>`;
+  } else {
+    const from = o.gmail ? esc(unwrap(o.gmail, CHAT_KEY) || "?") + " (guest)" : esc(o.by || "?");
+    body = `<p class="mute">Contact us, from ${from}</p><b>${esc(o.title)}</b><p>${esc(o.details)}</p>${okImg(o.shot) ? `<img src="${o.shot}" alt="screenshot">` : ""}`;
+    if (o.reply) body += `<p class="mute">Your reply: ${esc(o.reply)}</p>`;
+  }
+  let acts;
+  if (!canAct) acts = o.status === "transferred" ? '<p class="mute">Transferred to Legal. Only Legal and the owner can respond now.</p>' : "";
+  else {
+    const mine = o.status === "accepted" && o.assignedTo === me.name;
+    acts = (!o.status || o.status === "open" ? `<button class="btn" data-tk="accept">Accept</button>` : "") +
+      (mine && o.type === "message" ? `<button class="btn red" data-tk="delmsg">Delete message</button><button class="btn" data-tk="keep">Keep</button><button class="btn" data-tk="warn">Warn</button>` : "") +
+      (mine && o.type === "contact" ? `<input class="fld" id="tk-reply" placeholder="Reply"><button class="btn" data-tk="reply">Contact back</button>` : "") +
+      (mine ? `<button class="btn" data-tk="queue">Return to queue</button>` : "") +
+      (mine && me.role !== "legal" ? `<button class="btn" data-tk="legal">Transfer to Legal</button>` : "") +
+      (isLegal() && o.status === "transferred" ? `<button class="btn" data-tk="accept">Accept</button><button class="btn" data-tk="queue">Decline</button>` : "") +
+      `<button class="btn red" data-tk="del">Delete ticket</button>`;
+  }
+  return `<b>Ticket</b>${body}<div class="acts">${acts}<button class="btn" id="tk-close">Close</button></div>`;
+}
+let curTicket = null;
+function openTicket(id) {
+  const o = reportsCache.find(x => x.id === id); if (!o) return;
+  curTicket = o;
+  $("ticket-body").innerHTML = ticketHTML(o);
+  $("ticket").classList.remove("hide");
+  $("ticket-body").querySelector("#tk-close").onclick = () => $("ticket").classList.add("hide");
+}
+$("ticket-body").addEventListener("click", async e => {
+  const act = e.target.dataset.tk; if (!act || !curTicket) return;
+  const o = curTicket, close = () => { $("ticket").classList.add("hide"); loadReports(isLegal() ? "lg-reports" : "a-reports"); };
+  try {
+    if (act === "accept") { await patchDoc("reports/" + o.id, { status: "accepted", assignedTo: me.name }); if (o.by && o.by !== "guest") await add("notices", { to: o.by, type: "accepted", text: "Your ticket was accepted and is being worked on.", t: Date.now() }); close(); }
+    else if (act === "queue") { await patchDoc("reports/" + o.id, { status: "open", assignedTo: "" }); close(); }
+    else if (act === "legal") { await patchDoc("reports/" + o.id, { status: "transferred", assignedTo: "" }); close(); }
+    else if (act === "del") { await fetch(`${ROOT}/reports/${encodeURIComponent(o.id)}${KEY}`, { method: "DELETE" }); close(); }
+    else if (act === "delmsg") { await fetch(`${ROOT}/chat/${encodeURIComponent(o.msgId)}${KEY}`, { method: "DELETE" }); await patchDoc("reports/" + o.id, { resolution: "deleted" }); close(); }
+    else if (act === "keep") { await patchDoc("reports/" + o.id, { resolution: "kept" }); close(); }
+    else if (act === "warn") { await add("notices", { to: o.author, type: "warn", text: "A moderator warned you about a reported message.", t: Date.now() }); await patchDoc("reports/" + o.id, { resolution: "warned" }); close(); }
+    else if (act === "reply") {
+      const box = $("tk-reply"), txt = cleanText(box.value).slice(0, 500); if (!txt) return;
+      await patchDoc("reports/" + o.id, { reply: txt });
+      if (o.by && o.by !== "guest") await add("notices", { to: o.by, type: "ticket", text: "Support replied: " + txt, t: Date.now() });
+      close();
+    }
+  } catch { toast("That didn't work."); }
+});
+document.body.addEventListener("click", e => { if (e.target.dataset.ticket) { e.preventDefault(); openTicket(e.target.dataset.ticket); } });
+
+/* ---------- notices: ticket updates, 1-on-1 invites, warnings ---------- */
+function listenMine() {
+  if (me.role === "guest" || !window.listenNotices) return;
+  window.listenNotices(me.name, list => list.forEach(showNotice));
+}
+const seenNotice = new Set();
+let assistTimer = null;
+function showAssist(mins) {
+  clearTimeout(assistTimer);
+  const until = Date.now() + mins * 60000;
+  const tick = () => {
+    const left = Math.ceil((until - Date.now()) / 60000);
+    if (left <= 0) { $("notice").classList.add("hide"); return; }
+    $("notice").innerHTML = `An admin is helping with your ticket (~${left} min left). <button id="nmore">Need more time?</button>`;
+    $("notice").classList.remove("hide");
+    $("notice").querySelector("#nmore").onclick = () => showAssist(10);
+    assistTimer = setTimeout(tick, 15000);
+  };
+  tick();
+}
+function showNotice(n) {
+  if (seenNotice.has(n.id)) return; seenNotice.add(n.id);
+  fetch(`${ROOT}/notices/${encodeURIComponent(n.id)}${KEY}`, { method: "DELETE" }).catch(() => {});
+  if (n.type === "invite") {
+    if (Date.now() > n.t + 10000) return;
+    const box = $("notice");
+    box.innerHTML = `${esc(n.from)} wants to 1-on-1 chat. <button id="ninv-join">Join</button>`;
+    box.classList.remove("hide");
+    const timer = setTimeout(() => box.classList.add("hide"), Math.max(0, 10000 - (Date.now() - n.t)));
+    box.querySelector("#ninv-join").onclick = () => { clearTimeout(timer); box.classList.add("hide"); openDM(n.from); };
+  } else if (n.type === "accepted") { toast(n.text); showAssist(10); }
+  else toast(n.text || "You have a new notice.");
+}
+
+/* ---------- 1-on-1 chat (admin-user DM; not end-to-end private under open rules, see Firestore rules) ---------- */
+const dmRoom = (a, b) => [a, b].sort().join("~");
+let curDM = null;
+function openDM(other) {
+  curDM = other;
+  $("dm-title").textContent = "Chat with " + other;
+  $("dmlog").innerHTML = "";
+  $("dm").classList.remove("hide");
+  if (window.listenDM) window.listenDM(dmRoom(me.name, other), list => {
+    $("dmlog").innerHTML = list.map(m => `<p class="msg"><b>${esc(m.u)}</b>: ${esc(dec(m.x))}</p>`).join("") || '<p class="mute">Say hi!</p>';
+    $("dmlog").scrollTop = $("dmlog").scrollHeight;
+  });
+}
+$("dm-close").onclick = () => $("dm").classList.add("hide");
+$("dm-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const x = cleanText($("dm-in").value).slice(0, 500); if (!x || !curDM) return;
+  $("dm-in").value = "";
+  try { await add("dm", { room: dmRoom(me.name, curDM), u: me.name, x: wrap(x, CHAT_KEY), t: Date.now() }); } catch { toast("Message didn't send."); }
+});
+function invite(other) {
+  add("notices", { to: other, type: "invite", from: me.name, t: Date.now() })
+    .then(() => toast("Invite sent — they have 10 seconds to join."))
+    .catch(() => toast("Couldn't send the invite."));
+}
+
+/* ---------- account creation (dev+) ---------- */
+$("nu-save").onclick = async () => {
+  const msg = t => { $("nu-msg").textContent = t; };
+  if (!isDev()) return;
+  const u = $("nu-user").value.trim(), dob = $("nu-dob").value, pw = $("nu-pass").value, em = $("nu-mail").value;
+  if (!/^[A-Za-z0-9_.-]{3,24}$/.test(u)) return msg("Usernames can use letters, numbers, _ . - (3 to 24 characters).");
+  const age = tier(dob);
+  if (!age) return msg("Enter a valid birth date.");
+  if (pw.length < 6) return msg("Password needs 6+ characters.");
+  try {
+    if (await getUser(u)) return msg("That username is taken.");
+    const salt = CryptoJS.lib.WordArray.random(16).toString(), k = deriveKey(pw, salt);
+    const box = age === "1" ? {} : { gmail: wrap(em, k), dob: wrap(dob, k) };
+    await saveUser(u, { age, salt, hash: hash(pw, salt), ...box, role: "user" });
+    msg("Account created — share the username and temporary password with them. They'll know the password, so suggest they change it.");
+    $("nu-user").value = ""; $("nu-dob").value = ""; $("nu-mail").value = ""; $("nu-pass").value = "";
+  } catch { msg("Couldn't create the account."); }
+};
+
+/* ---------- password-change approval (owner/dev instantly, or 3 distinct admins) ---------- */
+async function loadPwReqs() {
+  if (!isAdmin()) { $("pw-list").innerHTML = ""; return; }
+  try {
+    const r = await fetch(`${ROOT}/pwreq${KEY}&pageSize=50`);
+    const rows = ((await r.json()).documents || []).map(parseDoc);
+    $("pw-list").innerHTML = rows.length ? "<table><tr><th>For</th><th>By</th><th>Approvals</th><th></th></tr>" + rows.map(o => {
+      const approvals = (o.approvals || "").split(",").filter(Boolean);
+      return `<tr><td>${esc(o.target)}</td><td>${esc(o.by)}</td><td>${isDev() ? "owner/dev approval" : approvals.length + "/3 admins"}</td><td>${o.by !== me.name ? `<button class="btn" data-appr="${esc(o.id)}">Approve</button>` : '<span class="mute">awaiting others</span>'} <button class="btn red" data-pwdel="${esc(o.id)}">Cancel</button></td></tr>`;
+    }).join("") + "</table>" : '<p class="mute">No pending requests.</p>';
+  } catch { $("pw-list").textContent = "Couldn't load requests."; }
+}
+$("pw-req").onclick = async () => {
+  const msg = t => { $("pw-msg").textContent = t; };
+  if (!isDev()) return msg("Only devs and the owner can start a request.");
+  const u = $("pw-user").value.trim(), pw = $("pw-new").value;
+  try {
+    const target = await getUser(u);
+    if (!target) return msg("No account with that username.");
+    const minLen = rk(target.role || "user") >= 6 ? 20 : 6;
+    if (pw.length < minLen) return msg(`That account needs a ${minLen}+ character password.`);
+    const hist = JSON.parse(target.pwHistory || "[]");
+    if (hist.some(h => hash(pw, h.salt) === h.hash) || hash(pw, target.salt) === target.hash) return msg("That matches one of their recent passwords.");
+    const salt = CryptoJS.lib.WordArray.random(16).toString();
+    await add("pwreq", { target: u, salt, hash: hash(pw, salt), by: me.name, approvals: "" });
+    msg("Requested. Needs one more owner/dev, or 3 admins, to approve.");
+    $("pw-user").value = ""; $("pw-new").value = "";
+    loadPwReqs();
+  } catch { msg("Couldn't submit the request."); }
+};
+$("pw-list").addEventListener("click", async e => {
+  const id = e.target.dataset.appr, del = e.target.dataset.pwdel;
+  if (!id && !del) return;
+  e.preventDefault();
+  try {
+    if (del) { if (isAdmin()) await fetch(`${ROOT}/pwreq/${encodeURIComponent(del)}${KEY}`, { method: "DELETE" }); loadPwReqs(); return; }
+    const r = await fetch(`${ROOT}/pwreq/${encodeURIComponent(id)}${KEY}`);
+    if (!r.ok) return loadPwReqs();
+    const o = parseDoc(await r.json());
+    if (o.by === me.name) return;
+    const target = await getUser(o.target);
+    const applyChange = async () => {
+      const hist = JSON.parse((target && target.pwHistory) || "[]");
+      const newHist = target ? [{ salt: target.salt, hash: target.hash }, ...hist].slice(0, 5) : hist;
+      await patch(o.target, { salt: o.salt, passwordHash: o.hash, pwHistory: JSON.stringify(newHist) });
+      await fetch(`${ROOT}/pwreq/${encodeURIComponent(id)}${KEY}`, { method: "DELETE" });
+      toast("Password changed.");
+    };
+    if (isDev()) await applyChange();
+    else if (isAdmin()) {
+      const approvals = (o.approvals || "").split(",").filter(Boolean);
+      if (!approvals.includes(me.name)) approvals.push(me.name);
+      if (approvals.length >= 3) await applyChange();
+      else await patchDoc("pwreq/" + id, { approvals: approvals.join(",") });
+    }
+    loadPwReqs();
+  } catch { toast("That didn't work."); }
+});
+
+/* ---------- chat bots ---------- */
+async function loadBots() {
+  if (!canBot()) { $("bot-list").innerHTML = ""; return; }
+  try {
+    const r = await fetch(`${ROOT}/bots${KEY}&pageSize=50`);
+    bots = ((await r.json()).documents || []).map(parseDoc);
+    $("bot-list").innerHTML = bots.length ? "<table><tr><th>Name</th><th>Keywords</th><th>Strikes</th><th>Action</th><th>On</th><th></th></tr>" + bots.map(b =>
+      `<tr><td>${esc(b.name)}</td><td>${esc(b.words)}</td><td>${b.x}</td><td>${b.action === "ban" ? b.hours + "h ban" : "warn"}</td><td>${b.on ? "yes" : "no"}</td><td><button class="btn red" data-botdel="${esc(b.id)}">Delete</button></td></tr>`).join("") + "</table>" : '<p class="mute">No bots yet.</p>';
+  } catch { $("bot-list").textContent = "Couldn't load bots."; }
+}
+$("bot-save").onclick = async () => {
+  const msg = t => { $("bot-msg").textContent = t; };
+  if (!canBot()) return;
+  const name = cleanText($("bot-name").value).slice(0, 40), words = cleanText($("bot-words").value).slice(0, 300);
+  const x = Number($("bot-x").value), action = $("bot-action").value, hours = Number($("bot-hours").value) || 1;
+  if (!name || !words || !(x > 0)) return msg("Fill in a name, keywords and strike count.");
+  try {
+    await add("bots", { name, words, x, action, hours, on: $("bot-on").checked, from: $("bot-from").value || "", to: $("bot-to").value || "" });
+    msg("Saved."); $("bot-name").value = ""; $("bot-words").value = ""; $("bot-x").value = "";
+    loadBots();
+  } catch { msg("Couldn't save."); }
+};
+$("bot-list").addEventListener("click", async e => {
+  const id = e.target.dataset.botdel; if (!id || !canBot()) return;
+  e.preventDefault();
+  try { await fetch(`${ROOT}/bots/${encodeURIComponent(id)}${KEY}`, { method: "DELETE" }); loadBots(); } catch {}
+});
+async function botCheck(text, d) {
+  const hm = new Date().toTimeString().slice(0, 5);
+  for (const b of bots) {
+    if (!b.on) continue;
+    if (b.from && b.to && !(b.from <= hm && hm <= b.to)) continue; // only active in its time window, if one is set
+    const words = (b.words || "").split(",").map(w => w.trim().toLowerCase()).filter(Boolean);
+    if (!words.some(w => text.toLowerCase().includes(w))) continue;
+    const field = "strikes_" + b.id, n = (d[field] || 0) + 1;
+    if (n >= b.x) { await patch(me.name, { [field]: 0 }); return b; }
+    await patch(me.name, { [field]: n });
+  }
+  return null;
+}
+
+/* ---------- legal panel ---------- */
+async function loadLegal() {
+  loadReports("lg-reports");
+  try {
+    const r = await fetch(`${DB}${KEY}&pageSize=300`);
+    const all = ((await r.json()).documents || []).map(parseDoc);
+    const kids = all.filter(u => u.age === "1" && !u.deletedAt);
+    $("lg-kids").innerHTML = kids.length ? "<table><tr><th>User</th></tr>" + kids.map(u => `<tr><td>${esc(u.id)}</td></tr>`).join("") + "</table>" : '<p class="mute">None.</p>';
+    legalBin = all.filter(u => u.deletedAt);
+    $("lg-bin").innerHTML = legalBin.length ? "<table><tr><th>User</th><th>Status</th><th></th></tr>" + legalBin.map(u =>
+      `<tr><td>${esc(u.id)}</td><td>${u.legalHold ? "on hold" : Math.ceil((u.purgeAt - Date.now()) / 864e5) + " days left"}</td><td><button class="btn" data-hold="${esc(u.id)}">${u.legalHold ? "Unpause" : "Pause"}</button></td></tr>`).join("") + "</table>" : '<p class="mute">Nothing in the bin.</p>';
+  } catch { $("lg-kids").textContent = "Couldn't load."; }
+  try {
+    const r = await fetch(`${ROOT}/reports${KEY}&orderBy=t%20desc&pageSize=50`);
+    const rows = ((await r.json()).documents || []).map(parseDoc).filter(o => o.status === "transferred");
+    $("lg-trans").innerHTML = rows.length ? "<table><tr><th>Type</th><th>From</th><th></th></tr>" + rows.map(o =>
+      `<tr><td>${esc(o.type)}</td><td>${esc(o.by || "?")}</td><td><button class="btn" data-ticket="${esc(o.id)}">Open</button> <button class="btn red" data-tkdel="${esc(o.id)}">Delete</button></td></tr>`).join("") + "</table>" : '<p class="mute">Nothing transferred.</p>';
+  } catch { $("lg-trans").textContent = "Couldn't load."; }
+}
+document.body.addEventListener("click", async e => {
+  if (e.target.dataset.hold && isLegal()) {
+    e.preventDefault();
+    const u = legalBin.find(x => x.id === e.target.dataset.hold); if (!u) return;
+    try { await patch(u.id, { legalHold: !u.legalHold }); loadLegal(); } catch { toast("Couldn't update."); }
+  }
+  if (e.target.dataset.tkdel && isLegal()) {
+    e.preventDefault();
+    try { await fetch(`${ROOT}/reports/${encodeURIComponent(e.target.dataset.tkdel)}${KEY}`, { method: "DELETE" }); loadLegal(); } catch {}
+  }
+});
+
+/* ---------- TOS (legal/owner edit, everyone can read) ---------- */
+async function loadTos() {
+  try {
+    const r = await fetch(`${ROOT}/meta/tos${KEY}`);
+    const text = r.ok ? (parseDoc(await r.json()).text || "") : "";
+    $("tos-text").textContent = text || "No Terms of Service have been posted yet.";
+    $("tos-area").value = text;
+  } catch { $("tos-text").textContent = "Couldn't load the Terms of Service."; }
+  $("tos-editbtn").classList.toggle("hide", !isLegal());
+}
+$("tos-editbtn").onclick = () => { $("tos-edit").classList.remove("hide"); $("tos-text").classList.add("hide"); };
+$("tos-save").onclick = async () => {
+  if (!isLegal()) return;
+  try { await put("meta/tos", { text: $("tos-area").value.slice(0, 20000) }); $("tos-msg").textContent = "Saved."; loadTos(); $("tos-edit").classList.add("hide"); $("tos-text").classList.remove("hide"); }
+  catch { $("tos-msg").textContent = "Couldn't save."; }
+};
+
+/* ---------- message of the day + dev preset commands ---------- */
+async function loadMotd() {
+  try {
+    const r = await fetch(`${ROOT}/meta/motd${KEY}`);
+    if (!r.ok) return;
+    const text = parseDoc(await r.json()).text;
+    if (text) toast("MOTD: " + text);
+  } catch {}
+}
+const HELP_TEXT = "/help  /clear  /bug_list  /prompt_reload  /whoami  /stats  /motd <text>  /theme <name>  /uptime";
+const BUGS = ["Guest sessions can leave a stale presence entry if the browser crashes.", "Chat read cost scales with open tabs.", "Password-reset history isn't trimmed server-side, only client-checked."];
+async function runCommand(raw) {
+  const [cmd, ...rest] = raw.slice(1).split(" "), arg = rest.join(" ");
+  if (cmd === "help") return HELP_TEXT;
+  if (cmd === "clear") { sessionStorage.clear(); return "Cleared this tab's local cache."; }
+  if (cmd === "bug_list") return BUGS.map((b, i) => (i + 1) + ". " + b).join("\n");
+  if (cmd === "prompt_reload") { await loadUpdates(); await loadBots(); return "Reloaded the update log and bots from Firestore."; }
+  if (cmd === "whoami") return `${me.name} — ${RNAME[me.role] || me.role}`;
+  if (cmd === "stats") { try { const r = await fetch(`${DB}${KEY}&pageSize=300`); return `${((await r.json()).documents || []).length} accounts on file.`; } catch { return "Couldn't load stats."; } }
+  if (cmd === "motd") { if (!arg) return "Usage: /motd <text>"; try { await put("meta/motd", { text: arg.slice(0, 200) }); return "Message of the day updated."; } catch { return "Couldn't save."; } }
+  if (cmd === "theme") { if (!THEMES[arg]) return "Themes: " + Object.keys(THEMES).join(", "); setTheme(arg); return "Theme set to " + arg + "."; }
+  if (cmd === "uptime") return "This session has been open for " + Math.round((Date.now() - began) / 60000) + " minute(s).";
+  return "Unknown command. Try /help.";
 }
 
 /* ---------- code advice ---------- */
