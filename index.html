@@ -3,17 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Welcome to GrapeGreen, the ultimate custom dashboard for chat, molecular science, coding advice, and top-tier memes.">
-<meta name="keywords" content="GrapeGreen, dashboard, global chat, coding advice, memes, custom web app">
-<meta name="author" content="GreatGamesGuy67">
-<meta http-equiv="Content-Security-Policy" content="frame-ancestors &apos;self&apos; https://*.google.com https://google.com;">
 <title>GrapeGreen Dashboard</title>
+<meta name="description" content="GrapeGreen Dashboard: sign up or log in to chat, browse memes, and manage your account.">
+<meta name="keywords" content="GrapeGreen, GrapeGreen Dashboard, chat app, dashboard, community">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="GrapeGreen Dashboard">
+<meta property="og:description" content="Sign up or log in to chat, browse memes, and manage your account.">
+<meta property="og:type" content="website">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getFirestore, collection, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 const db = getFirestore(initializeApp({ projectId: "app-iguess-39f2f", apiKey: "AIzaSyAqy6NWFJ1KD9Cfv_WyqbMJJWCqlC5P7Es" }));
 window.listenChat = (ok, bad) => onSnapshot(query(collection(db, "chat"), orderBy("t", "desc"), limit(60)), snap => ok(snap.docs.map(d => ({ id: d.id, ...d.data() }))), bad);
+window.listenNotices = (user, ok) => onSnapshot(query(collection(db, "notices"), where("to", "==", user)), snap => ok(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+window.listenDM = (room, ok) => onSnapshot(query(collection(db, "dm"), where("room", "==", room), orderBy("t", "asc"), limit(100)), snap => ok(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
 </script>
 <style>
 :root{--grape:#3b1a63;--grape2:#7a4bb8;--leaf:#a3d95c;--paper:#f6f2fb;--ink:#1b1030;--mute:#6b5f85;--line:#ddd3ee}
@@ -108,13 +112,14 @@ input[type=checkbox]{accent-color:var(--grape2);width:18px;height:18px}
 .av-b{width:40px;height:40px;font-size:22px;padding:0;border:2px solid var(--line);border-radius:10px;background:#fff}
 .av-b.on{border-color:var(--grape2);background:var(--paper)}
 td img{display:block;margin-top:6px;border:1px solid var(--line);border-radius:6px}
-#upl ul{padding:0;margin:8px 0 0}
-.ch{list-style:none;margin:6px 0;padding:6px 10px;border-radius:8px;border-left:4px solid}
-.ch b{font-size:11px;letter-spacing:.05em;margin-right:8px}
-.ch.add{background:#e6f7ea;border-color:#2e9e4f;color:#14532d}
-.ch.chg{background:#fff6d6;border-color:#e0a800;color:#6b4e00}
-.ch.rem{background:#fde8e8;border-color:#d63b3b;color:#7f1d1d}
-.ch.pl{border-color:var(--line)}
+.ovl{position:fixed;inset:0;z-index:9980;display:grid;place-items:start center;padding-top:50px;background:#0007;overflow:auto}
+.ovl .dlg{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;width:min(560px,94vw);box-shadow:0 10px 30px #0004;margin-bottom:40px}
+.ovl .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap}
+.ovl img{max-width:100%;border-radius:6px;margin-top:6px}
+.chk{color:#1d9bf0;font-size:13px}
+#notice{position:fixed;left:50%;top:60px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:10001;display:flex;gap:10px;align-items:center}
+#notice button{background:var(--leaf);color:var(--ink);border:0;border-radius:8px;padding:6px 10px;font-weight:700}
+#dmlog{height:40vh;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px;margin:10px 0}
 @media(max-width:760px){#gate{grid-template-columns:1fr}.brand{display:none}.side{width:120px}main{margin-left:120px}}
 </style>
 </head>
@@ -128,6 +133,14 @@ td img{display:block;margin-top:6px;border:1px solid var(--line);border-radius:6
   <input id="del-pw" type="password" autocomplete="current-password" aria-label="Password" style="width:100%;padding:10px;border:2px solid var(--line);border-radius:8px">
   <div id="del-err" style="color:#c62828;font-size:14px;min-height:20px;margin-top:6px"></div>
   <div class="acts"><button class="btn" id="del-cancel">Cancel</button><button class="btn red" id="del-ok">Delete</button></div>
+</div></div>
+<div id="notice" class="hide" role="status"></div>
+<div id="ticket" class="ovl hide"><div class="dlg" id="ticket-body"></div></div>
+<div id="dm" class="ovl hide"><div class="dlg">
+  <b id="dm-title">Chat</b>
+  <div id="dmlog"></div>
+  <form id="dm-form" style="display:flex;gap:8px"><input class="fld" id="dm-in" style="margin:0" placeholder="Message..." autocomplete="off"><button class="btn">Send</button></form>
+  <div class="acts"><button class="btn" id="dm-close">Close</button></div>
 </div></div>
 
 <div id="gate">
@@ -180,6 +193,8 @@ td img{display:block;margin-top:6px;border:1px solid var(--line);border-radius:6
   <button class="side-item" data-tab="chat">Chat</button>
   <button class="side-item" data-tab="updates">Update log</button>
   <button class="side-item" data-tab="help">Help</button>
+  <button class="side-item" data-tab="tos">TOS</button>
+  <button class="side-item hide" id="nav-legal" data-tab="legal">Legal panel</button>
   <button class="side-item hide" id="nav-admin" data-tab="admin">Admin panel</button>
 </nav>
 
@@ -258,18 +273,68 @@ td img{display:block;margin-top:6px;border:1px solid var(--line);border-radius:6
     <div class="adm">
       <input id="a-user" placeholder="Username">
       <input id="a-hours" type="number" min="1" placeholder="Ban hours">
-      <button class="btn" data-a="ban">Ban (hours)</button>
-      <button class="btn red" data-a="perm">Perm ban</button>
+      <button class="btn" data-a="ban">Temp ban (mod+)</button>
+      <button class="btn red" data-a="perm">Perm ban (admin+)</button>
       <button class="btn" data-a="unban">Unban</button>
+      <button class="btn" data-a="role:mod">Make mod</button>
       <button class="btn" data-a="role:admin">Make admin</button>
+      <button class="btn" data-a="role:headadmin">Make head admin</button>
+      <button class="btn" data-a="role:legal">Make legal</button>
       <button class="btn" data-a="role:dev">Make dev</button>
       <button class="btn" data-a="role:user">Make user</button>
-      <button class="btn red" data-a="delete">Delete account</button>
+      <button class="btn" data-a="dm">1-on-1 chat</button>
+      <button class="btn red" data-a="delete">Delete account (admin+)</button>
     </div>
     <div id="a-msg" class="mute"></div>
+
+    <div id="acc-card" class="card hide" style="max-width:560px"><h3>Create an account (dev+)</h3>
+      <input class="fld" id="nu-user" placeholder="Username">
+      <input class="fld" id="nu-dob" type="date" aria-label="Date of birth">
+      <input class="fld" id="nu-mail" type="email" placeholder="Email (skipped if under 13)">
+      <input class="fld" id="nu-pass" type="password" placeholder="Temporary password (6+ chars)">
+      <button class="btn" id="nu-save">Create</button> <span class="mute" id="nu-msg"></span></div>
+
+    <div id="pw-card" class="card hide" style="max-width:560px"><h3>Reset a password</h3>
+      <p class="mute">A dev/owner request applies once another dev/owner approves. An admin needs 3 different admins to approve. Only devs and the owner can start a request.</p>
+      <input class="fld" id="pw-user" placeholder="Username">
+      <input class="fld" id="pw-new" type="password" placeholder="New password (6+ chars)">
+      <button class="btn" id="pw-req">Request change</button> <span class="mute" id="pw-msg"></span>
+      <div id="pw-list"></div></div>
+
+    <div id="bot-card" class="card hide" style="max-width:560px"><h3>Chat bots (dev / head admin / owner)</h3>
+      <input class="fld" id="bot-name" placeholder="Bot name">
+      <input class="fld" id="bot-words" placeholder="Keywords, comma-separated">
+      <input class="fld" id="bot-x" type="number" min="1" placeholder="Strikes before action">
+      <select class="fld" id="bot-action"><option value="warn">Warn in chat</option><option value="ban">Temp ban (hours below)</option></select>
+      <input class="fld" id="bot-hours" type="number" min="1" placeholder="Ban hours (if temp ban)">
+      <div class="row" style="flex-direction:row;align-items:center;gap:16px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="bot-on" checked> Enabled</label>
+        <span>Active <input id="bot-from" type="time" aria-label="Active from"> to <input id="bot-to" type="time" aria-label="Active to"> (optional)</span>
+      </div>
+      <button class="btn" id="bot-save">Save bot</button> <span class="mute" id="bot-msg"></span>
+      <div id="bot-list"></div></div>
+
     <h3>Users</h3><div id="a-users"></div>
-    <h3>Reports &amp; contact log</h3><div id="a-reports"></div>
+    <h3>Reports &amp; tickets</h3><div id="a-reports"></div>
     <div id="a-binbox"><h3>Bin (kept 90 days)</h3><div id="a-bin"></div></div>
+  </section>
+
+  <section id="tos" class="view">
+    <h1>Terms of Service</h1>
+    <div id="tos-text" class="card" style="max-width:640px;white-space:pre-wrap"></div>
+    <div id="tos-edit" class="hide" style="max-width:640px">
+      <textarea class="fld" id="tos-area" rows="12"></textarea>
+      <button class="btn" id="tos-save">Save</button> <span class="mute" id="tos-msg"></span>
+    </div>
+    <button class="btn hide" id="tos-editbtn" style="margin-top:10px">Edit (legal/owner)</button>
+  </section>
+
+  <section id="legal" class="view">
+    <h1>Legal panel</h1>
+    <h3>Chat &amp; contact reports</h3><div id="lg-reports"></div>
+    <h3>Under-13 users</h3><div id="lg-kids"></div>
+    <h3>Transferred tickets</h3><div id="lg-trans"></div>
+    <h3>Deleted accounts</h3><div id="lg-bin"></div>
   </section>
 
   <section id="updates" class="view">
@@ -343,7 +408,7 @@ async function saveUser(u, p) {
 }
 
 let beat = null;
-const presenceUrl = u => `https://${CFG.projectId}-default-rtdb.firebaseio.com/presence/${encodeURIComponent(u)}.json`;
+const presenceUrl = u => `https://${CFG.projectId}-default-rtdb.firebaseio.com/presence/${encodeURIComponent(u.replace(/\./g, ","))}.json`; // Realtime DB keys can't contain "."
 function heartbeat(u) {
   clearInterval(beat);
   const url = presenceUrl(u);
@@ -823,25 +888,20 @@ AVATARS.forEach(e => {
 
 /* ---------- update log ---------- */
 const UP0 = [
-  { v: "v1.0", title: "Fresh start", notes: "+ New login screen\n+ Under-13 sign-ups keep only a username and password hash\n+ Firestore sign-up and login" },
-  { v: "v1.1", title: "Chat & Admin", notes: "+ Global chat with bold, underline and hidden text\n+ Admin panel: ban, promote, demote\n+ Delete account with a 90-day bin" },
-  { v: "v1.2", title: "Security+", notes: "+ Email and birthday encrypted \n+ Kids-only chat room\n~ Settings page redesigned with themes\n- Removed alert() pop-ups" }
+  { v: "v1.0", title: "Fresh start", notes: "New login screen\nUnder-13 sign-ups keep only a username and password hash\nFirestore sign-up and login" },
+  { v: "v1.1", title: "Chat & Admin", notes: "Global chat with bold, underline and hidden text\nAdmin panel: ban, promote, demote\nDelete account with a 90-day bin" },
+  { v: "v1.2", title: "Security+", notes: "Email and birthday encrypted (Base64, AES-256, Base16)\nKids-only chat room\nThemes and a new Settings page\nNo more alert() pop-ups" }
 ];
 const VOK = /^v\d+(\.\d+)*$/;
 const vcmp = (a, b) => { const x = a.slice(1).split(".").map(Number), y = b.slice(1).split(".").map(Number);
   for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (y[i] || 0) - (x[i] || 0); if (d) return d; } return 0; };
-const CH = { "+": ["add", "ADD"], "~": ["chg", "CHANGE"], "-": ["rem", "REMOVE"] };
-const chLine = l => {
-  const k = CH[l[0]], t = k ? l.slice(1).trim() : l;
-  return `<li class="ch ${k ? k[0] : "pl"}">${k ? `<b>${k[1]}</b>` : ""}${esc(t)}</li>`;
-};
 let ups = [];
 async function loadUpdates() {
   const m = new Map(UP0.map(e => [e.v, e]));
   try { const r = await fetch(`${ROOT}/updates${KEY}&pageSize=100`);
     ((await r.json()).documents || []).map(parseDoc).forEach(o => { if (VOK.test(o.v || "")) m.set(o.v, { v: o.v, title: o.title || "", notes: o.notes || "" }); }); } catch {}
   ups = [...m.values()].sort((a, b) => vcmp(a.v, b.v));
-  $("upl").innerHTML = ups.map(e => `<div class="card" style="max-width:560px;margin-bottom:12px"><h3>${esc(e.v)}${isDev() ? ` · <a href="#" data-up="${esc(e.v)}">edit</a>` : ""}</h3><b>${esc(e.title)}</b><ul>${e.notes.split("\n").filter(Boolean).map(chLine).join("")}</ul></div>`).join("");
+  $("upl").innerHTML = ups.map(e => `<div class="card" style="max-width:560px;margin-bottom:12px"><h3>${esc(e.v)}${isDev() ? ` · <a href="#" data-up="${esc(e.v)}">edit</a>` : ""}</h3><b>${esc(e.title)}</b><ul>${e.notes.split("\n").filter(Boolean).map(l => `<li>${esc(l)}</li>`).join("")}</ul></div>`).join("");
 }
 $("upl").addEventListener("click", e => {
   const u = ups.find(x => x.v === e.target.dataset.up); if (!u) return;
