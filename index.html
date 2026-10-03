@@ -1395,51 +1395,28 @@ $("cmd-in").addEventListener("keydown", async e => {
 const LEGAL_WORDS = ["court", "sue", "sued", "suing", "lawsuit", "attorney", "lawyer", "legal action", "subpoena"];
 const HUMAN_WORDS = ["human", "representative", "real person", "talk to someone", "speak to someone", "speak with someone", "agent"];
 let botTicket = null, botLocked = false, botSynced = new Set();
-
 document.getElementById("bot-tos-link").onclick = e => { e.preventDefault(); switchTab("tos"); };
 document.getElementById("ct-tos-link").onclick = e => { e.preventDefault(); switchTab("tos"); };
-
-function botSay(text) { 
-  \$("bot-chat-log").insertAdjacentHTML("beforeend", `<p class="msg"><b>Bot</b>: ${esc(text)}</p>`); 
-  ("bot-chat-log").scrollTop = ("bot-chat-log").scrollHeight; 
-}
-
-function botUserSay(text) { 
-  \$("bot-chat-log").insertAdjacentHTML("beforeend", `<p class="msg"><b>You</b>: ${esc(text)}</p>`); 
-  ("bot-chat-log").scrollTop = ("bot-chat-log").scrollHeight; 
-}
-
-\$("bot-agree").onclick = () => { 
-  \$("bot-chat-intro").classList.add("hide"); 
-  \$("bot-chat-form").classList.remove("hide"); 
-  botSay("Thanks! What can I help you with?"); 
-};
-
-\$("bot-decline").onclick = () => botSay("No problem — you can read the Terms any time, and come back when you're ready.");
-
+function botSay(text) { $("bot-chat-log").insertAdjacentHTML("beforeend", `<p class="msg"><b>Bot</b>: ${esc(text)}</p>`); $("bot-chat-log").scrollTop = $("bot-chat-log").scrollHeight; }
+function botUserSay(text) { $("bot-chat-log").insertAdjacentHTML("beforeend", `<p class="msg"><b>You</b>: ${esc(text)}</p>`); $("bot-chat-log").scrollTop = $("bot-chat-log").scrollHeight; }
+$("bot-agree").onclick = () => { $("bot-chat-intro").classList.add("hide"); $("bot-chat-form").classList.remove("hide"); botSay("Thanks! What can I help you with?"); };
+$("bot-decline").onclick = () => botSay("No problem — you can read the Terms any time, and come back when you're ready.");
 function listenBotTicket() {
   if (!window.listenDM) return;
   const me2 = me.role === "guest" ? "guest" : me.name;
   window.listenDM("ticket:" + botTicket, list => list.forEach(m => {
     if (botSynced.has(m.id) || m.u === me2) return;
     botSynced.add(m.id);
-    \$("bot-chat-log").insertAdjacentHTML("beforeend", `<p class="msg"><b>${esc(m.u)}</b>: ${esc(dec(m.x))}</p>`);
-    ("bot-chat-log").scrollTop = ("bot-chat-log").scrollHeight;
+    $("bot-chat-log").insertAdjacentHTML("beforeend", `<p class="msg"><b>${esc(m.u)}</b>: ${esc(dec(m.x))}</p>`);
+    $("bot-chat-log").scrollTop = $("bot-chat-log").scrollHeight;
   }));
 }
-
-\$("bot-chat-form").addEventListener("submit", async e => {
+$("bot-chat-form").addEventListener("submit", async e => {
   e.preventDefault();
-  const x = cleanText(\$("bot-chat-in").value).slice(0, 500); if (!x) return;
-  \$("bot-chat-in").value = ""; botUserSay(x);
-  
-  if (botLocked) { 
-    botSay("This chat has been passed to Legal — refresh the page to start a new help chat."); 
-    return; 
-  }
-  
+  const x = cleanText($("bot-chat-in").value).slice(0, 500); if (!x) return;
+  $("bot-chat-in").value = ""; botUserSay(x);
+  if (botLocked) { botSay("This chat has been passed to Legal — refresh the page to start a new help chat."); return; }
   const low = x.toLowerCase(), by = me.role === "guest" ? "guest" : me.name;
-  
   try {
     if (LEGAL_WORDS.some(w => low.includes(w))) {
       botLocked = true;
@@ -1457,32 +1434,9 @@ function listenBotTicket() {
     } else if (botTicket) {
       await add("dm", { room: "ticket:" + botTicket, u: by, x: wrap(x, CHAT_KEY), t: Date.now() });
     } else {
-      // Custom keyword responses
-      if (low === "hi" || low === "hello" || low === "hey") {
-        botSay("Hello! How can I help you today?");
-      } 
-      else if (low.includes("how are you")) {
-        botSay("I'm doing well, thank you for asking! How can I assist you?");
-      } 
-      else if (low.includes("i need help") || low === "help") {
-        botSay("What do you need help with? Tell me a bit more, or say 'human' to reach our support team.");
-      } 
-      else if (low.includes("tos") || low.includes("terms")) {
-        botSay("Please check our official Terms of Service page for detailed TOS information.");
-      } 
-      // Default fallback responses
-      else {
-        botSay(low.includes("password") 
-          ? "You can change your password from Settings." 
-          : low.includes("ban") 
-            ? "If a ban seems wrong, tell me more and I'll pass it to the team if needed." 
-            : "Got it — tell me more, or say \"human\" to talk to a team member."
-        );
-      }
+      botSay(low.includes("password") ? "You can change your password from Settings." : low.includes("ban") ? "If a ban seems wrong, tell me more and I'll pass it to the team if needed." : "Got it — tell me more, or say \"human\" to talk to a team member.");
     }
-  } catch { 
-    botSay("Something went wrong sending that. Try again."); 
-  }
+  } catch { botSay("Something went wrong sending that. Try again."); }
 });
 
 /* ---------- code advice ---------- */
