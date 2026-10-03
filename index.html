@@ -1518,20 +1518,31 @@ $("bot-chat-form").addEventListener("submit", async e => {
 
 /* ---------- staff chat (mod+) ---------- */
 let staffMsgs = [];
+
 function renderStaff() {
   const box = $("staff-msgs");
-  box.innerHTML = staffMsgs.map(m => `<p class="msg"><b>${esc(m.u)}</b>: ${esc(dec(m.x))}</p>`).join("") || '<p class="mute">No messages yet.</p>';
+  box.innerHTML = staffMsgs.map(m => {
+    const text = dec(m.x || "");
+    return `<p class="msg"><b>${esc(m.u || "Unknown")}</b>: ${esc(text)}</p>`;
+  }).join("") || '<p class="mute">No staff messages yet.</p>';
   box.scrollTop = box.scrollHeight;
 }
+
 function listenStaffChat() {
   if (!isMod() || !window.listenStaff) return;
-  window.listenStaff(list => { staffMsgs = list.slice().reverse(); renderStaff(); }, () => {});
+  window.listenStaff(list => {
+    staffMsgs = list.slice().reverse();
+    renderStaff();
+  }, () => {});
 }
+
 $("staff-form").addEventListener("submit", async e => {
   e.preventDefault();
   const x = cleanText($("staff-in").value).slice(0, 500);
   if (!x || !isMod()) return;
+
   $("staff-in").value = "";
+
   try {
     await fetch(`${ROOT}/staffchat${KEY}`, {
       method: "POST",
@@ -1545,7 +1556,9 @@ $("staff-form").addEventListener("submit", async e => {
         }
       })
     });
-  } catch { toast("Message didn't send."); }
+  } catch {
+    toast("Message didn't send.");
+  }
 });
 
 /* ---------- safe markdown subset for profile bios (escape first, then a few tags; links need http(s)) ---------- */
