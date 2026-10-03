@@ -408,7 +408,7 @@ td img{display:block;margin-top:6px;border:1px solid var(--line);border-radius:6
   <section id="help" class="view">
     <h1>Help</h1>
     <div class="card" style="max-width:560px;margin-bottom:16px"><h3>Limit of liability (lol)</h3>
-      <p class="mute">GrapeGreen is provided "as is" by a person with a keyboard. We are not liable for lost memes, emotional damage from the Wall of Memes, chat messages you regret, or the heat death of the universe. Use at your own risk. This is a joke, not a real legal document.</p></div>
+      <p class="mute">GrapeGreen is provided "as is" by a person with a keyboard. We are not liable for lost memes, emotional damage from the Wall of Memes, chat messages you regret, or the heat death of the universe. Use at your own risk. This summary card is a joke, but our official TOS tab is a real legal document!</p></div>
 
     <div class="card" id="bot-chat-card" style="max-width:560px;margin-bottom:16px"><h3>🤖 Support bot</h3>
       <p class="mute">A simple scripted assistant, not real AI — it looks for a few keywords.</p>
@@ -1518,20 +1518,47 @@ $("bot-chat-form").addEventListener("submit", async e => {
 
 /* ---------- staff chat (mod+) ---------- */
 let staffMsgs = [];
+
 function renderStaff() {
   const box = $("staff-msgs");
-  box.innerHTML = staffMsgs.map(m => `<p class="msg"><b>${esc(m.u)}</b>: ${esc(dec(m.x))}</p>`).join("") || '<p class="mute">No messages yet.</p>';
+  box.innerHTML = staffMsgs.map(m => {
+    const text = dec(m.x || "");
+    return `<p class="msg"><b>${esc(m.u || "Unknown")}</b>: ${esc(text)}</p>`;
+  }).join("") || '<p class="mute">No staff messages yet.</p>';
   box.scrollTop = box.scrollHeight;
 }
+
 function listenStaffChat() {
   if (!isMod() || !window.listenStaff) return;
-  window.listenStaff(list => { staffMsgs = list.slice().reverse(); renderStaff(); }, () => {});
+  window.listenStaff(list => {
+    staffMsgs = list.slice().reverse();
+    renderStaff();
+  }, () => {});
 }
+
 $("staff-form").addEventListener("submit", async e => {
   e.preventDefault();
-  const x = cleanText($("staff-in").value).slice(0, 500); if (!x || !isMod()) return;
+  const x = cleanText($("staff-in").value).slice(0, 500);
+  if (!x || !isMod()) return;
+
   $("staff-in").value = "";
-  try { await add("staffchat", { u: me.name, x: wrap(x, CHAT_KEY), t: Date.now() }); } catch { toast("Message didn't send."); }
+
+  try {
+    await fetch(`${ROOT}/staffchat${KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fields: {
+          u: { stringValue: me.name },
+          x: { stringValue: wrap(x, CHAT_KEY) },
+          r: { stringValue: me.role },
+          t: { integerValue: String(Date.now()) }
+        }
+      })
+    });
+  } catch {
+    toast("Message didn't send.");
+  }
 });
 
 /* ---------- safe markdown subset for profile bios (escape first, then a few tags; links need http(s)) ---------- */
