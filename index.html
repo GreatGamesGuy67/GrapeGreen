@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="0;url=dashboard/index.html">
 <title>GrapeGreen Dashboard</title>
 <meta name="description" content="GrapeGreen Dashboard: sign up or log in to chat, browse memes, and manage your account.">
 <meta name="keywords" content="GrapeGreen, GrapeGreen Dashboard, chat app, dashboard, community">
@@ -11,24 +12,36 @@
 <meta property="og:title" content="GrapeGreen Dashboard">
 <meta property="og:description" content="Sign up or log in to chat, browse memes, and manage your account.">
 <meta property="og:type" content="website">
+
+<!-- Configuration for the link sharing card preview -->
+<meta property="og:image" content="thing.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="thing.png">
+
+<script>
+  window.location.replace("dashboard/index.html");
+</script>
 <style>
   html, body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
+    background-color: #3b1360;
     overflow: hidden;
   }
-  iframe {
+  
+  /* Displays the thumbnail across the entire screen during load */
+  .giant-thumbnail {
     width: 100%;
     height: 100%;
-    border: none;
-    display: block;
+    object-fit: cover;
     position: absolute;
     top: 0;
     left: 0;
     z-index: 2;
   }
+
   .seo-hidden {
     position: absolute;
     top: 0;
@@ -41,8 +54,10 @@
 </head>
 <body>
 
-  <iframe src="dashboard/index.html" title="GrapeGreen Dashboard Application"></iframe>
+  <!-- Only the huge thumbnail image is visible on the screen -->
+  <img src="thing.png" class="giant-thumbnail" alt="GrapeGreen Preview Asset">
 
+  <!-- Hidden text infrastructure layer for web crawling search spiders -->
   <div class="seo-hidden">
     <h1>GrapeGreen Dashboard</h1>
     <h2>Your dashboard, your tabs, your memes.</h2>
