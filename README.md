@@ -42,5 +42,4 @@ This project includes:
 - Memes wall and support bot interface
 
 ## Contributing
-
 Contributions are welcome if you want to improve the app's UX, add features, tighten security, or clean up the frontend structure.
