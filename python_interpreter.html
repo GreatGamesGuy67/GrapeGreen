@@ -1,61 +1,64 @@
 <!DOCTYPE HTML>
 <html lang="en">
   <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script defer src="https://pyscript.net/latest/pyscript.js"></script>
-<link rel="stylesheet" href="https://pyscript.net/latest/pydide.css">
+    <link rel="stylesheet" href="https://pyscript.net/latest/pydide.css" />
     <style>
-      body { background-color: #000000; }
-      head { background-color: #000000; }
+      body { background-color: #000000; color: white; }
+      html, body { margin: 0; padding: 0; }
     </style>
   </head>
   <body>
     <script>
-    // Keep track of IDs we have already processed so we only run them once
-const processedIds = new Set();
+      const processedIds = new Set();
 
-// Start checking localStorage every 50 milliseconds
-setInterval(() => {
-    try {
-        // 1. Grab the item from localStorage (change 'myAppData' to your actual key)
-        const rawData = localStorage.getItem('myAppData');
-        if (!rawData) return; 
+      setInterval(() => {
+        try {
+          const rawData = localStorage.getItem('myAppData');
+          if (!rawData) return;
 
-        // 2. Parse the text into a readable JSON object
-        const data = JSON.parse(rawData);
+          const data = JSON.parse(rawData);
+          const {
+            ID,
+            payload,
+            "passcode token": passcodeToken,
+            "run?": runStatus
+          } = data;
 
-        // 3. Destructure the exact keys you are looking for
-        const { ID, timestamp, payload, "passcode token": passcodeToken, "run?": runStatus } = data;
+          const shouldRun = runStatus === true || runStatus === 'true';
 
-        // 4. Verify conditions: must match keys, run? must be "true", and cannot be processed before
-        if (ID && runStatus === "true" && !processedIds.has(ID)) {
-            
-            // Mark it as processed immediately to prevent double-runs
+          if (ID && shouldRun && !processedIds.has(ID)) {
             processedIds.add(ID);
-
-            // 5. Execute your target logic here
             executePayload(ID, payload, passcodeToken);
+          }
+        } catch (error) {
+          // Ignore malformed/incomplete data while writing
         }
-    } catch (error) {
-        // Silently fail if JSON is temporarily incomplete or malformed during a write
-    }
-}, 50); // Checks exactly every 50ms
+      }, 50);
 
-// The function that executes your task
-function executePayload(id, payload, token) {
-    // Put your actual execution logic here
-}
-  </script>
+      function executePayload(id, payload, token) {
+        if (window && window.executePythonPayload) {
+          try {
+            window.executePythonPayload(id, payload, token);
+          } catch (error) {
+            console.error('Failed to call Python payload handler:', error);
+          }
+        } else {
+          console.warn('Python payload handler is not ready yet.');
+        }
+      }
+    </script>
+
     <script type="py">
-        from shortcuts import window
-        import create_proxy
+      from js import window
+      from pyodide import create_proxy
 
-        # This is your Python function that runs the logic
-        def my_python_execution(id, payload, token):
-            # Write your silent Python processing code here
-            pass
+      def my_python_execution(id, payload, token):
+          print(f"Python payload triggered for id={id}, token={token}, payload={payload}")
 
-        # Expose the Python function so JavaScript can see and call it
-        window.executePythonPayload = create_proxy(my_python_execution)
+      window.executePythonPayload = create_proxy(my_python_execution)
     </script>
   </body>
 </html>
