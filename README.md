@@ -41,32 +41,6 @@ This project includes:
 - Update log and help screen
 - Memes wall and support bot interface
 
-## Running locally
-
-Because this is a static front-end project, you can run it by serving the repo root with any local web server.
-
-Example:
-
-```bash
-python -m http.server 8000
-```
-
-Then open:
-
-```text
-http://localhost:8000/
-```
-
-## Notes
-
-- The app is primarily a front-end prototype and uses Firebase-style APIs in the browser for persistence and realtime updates.
-- Some functionality depends on external configuration and service access.
-- This repository is intended as a demo/community app project rather than a formal production-ready service.
-
-## License
-
-This project does not currently include a license file. If you plan to distribute or reuse it publicly, consider adding an explicit open-source license.
-
 ## Contributing
 
 Contributions are welcome if you want to improve the app's UX, add features, tighten security, or clean up the frontend structure.
