@@ -49,6 +49,18 @@
     </script>
 
     <script type="py">
+      import sys
+
+# Block dangerous modules before they can be imported
+blocked_modules = {
+    'os', 'subprocess', 'sys', 'importlib', 'eval', 'exec',
+    '__import__', 'compile', 'open', 'input', '__builtins__'
+}
+
+# Remove from sys.modules to prevent imports
+for module in blocked_modules:
+    if module in sys.modules:
+        del sys.modules[module]
       from js import window
       from pyodide import create_proxy
 
