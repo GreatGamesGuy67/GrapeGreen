@@ -14,7 +14,7 @@
     <script>
       const processedIds = new Set();
 
-      setInterval(() => {
+      function tryDispatch() {
         try {
           const rawData = localStorage.getItem('myAppData');
           if (!rawData) return;
@@ -31,24 +31,21 @@
 
           if (ID && shouldRun && !processedIds.has(ID)) {
             processedIds.add(ID);
-            executePayload(ID, payload, passcodeToken);
+
+            if (window.executePythonPayload) {
+              window.executePythonPayload(ID, payload, passcodeToken);
+            } else {
+              console.warn('Python payload handler is not ready yet.');
+            }
           }
         } catch (error) {
-          // Ignore malformed/incomplete data while writing
-        }
-      }, 50);
-
-      function executePayload(id, payload, token) {
-        if (window && window.executePythonPayload) {
-          try {
-            window.executePythonPayload(id, payload, token);
-          } catch (error) {
-            console.error('Failed to call Python payload handler:', error);
-          }
-        } else {
-          console.warn('Python payload handler is not ready yet.');
+          console.error('Error in tryDispatch:', error);
         }
       }
+
+      window.addEventListener('py:ready', () => {
+        setInterval(tryDispatch, 100);
+      });
     </script>
 
     <script type="py">
@@ -56,7 +53,10 @@
       from pyodide import create_proxy
 
       def my_python_execution(id, payload, token):
-          print(f"Python payload triggered for id={id}, token={token}, payload={payload}")
+          try:
+              exec(payload)
+          except Exception as e:
+              print(f"Error executing payload: {e}")
 
       window.executePythonPayload = create_proxy(my_python_execution)
     </script>
