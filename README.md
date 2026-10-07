@@ -13,15 +13,6 @@ This project includes:
 - QR code generation and simple utility pages
 - A meme gallery / wall of memes
 - Admin, legal, and support flows for community management
-
-## Project structure
-
-- `index.html` — landing page that redirects into the dashboard app
-- `dashboard/index.html` — main dashboard shell and app entry point
-- `dashboard/dashboard/index.html` — the actual application logic and UI
-- `assets/` — image assets used by the app, including memes and UI visuals
-- `thing.png` / `x.png` — branding and preview images
-
 ## Features
 
 ### Authentication and accounts
